@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:order.buildsnlenses.com)",
+      "WebFetch(domain:buildsnlenses.com)",
+      "WebFetch(domain:hdphotohub.com)",
+      "WebFetch(domain:api.hdphotohub.com)",
+      "WebFetch(domain:api.buildsnlenses.com)",
+      "WebFetch(domain:www.learn.hdphotohub.com)",
+      "WebFetch(domain:learn.hdphotohub.com)",
+      "WebFetch(domain:help.hdphotohub.com)",
+      "WebFetch(domain:support.hdphotohub.com)",
+      "WebFetch(domain:docs.hdphotohub.com)",
+      "WebSearch",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(echo \"PATH: $PATH\")",
+      "Read(//Users/assaf/.nvm/versions/**)",
+      "Read(//Users/assaf/.bun/**)"
+    ]
+  }
+}
