@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { hdphFetch } from "@/lib/hdph-client";
 import {
@@ -9,12 +8,13 @@ import {
 } from "@/lib/data-transforms";
 import type { HdphSite } from "@/types/hdph";
 
+export const maxDuration = 60;
+
 const anthropic = new Anthropic();
 
 export async function GET() {
   try {
     const sites = await hdphFetch<HdphSite[]>("/sites");
-
     const bundles = computeBundles(sites).slice(0, 10);
     const services = computeServiceFrequency(sites);
     const monthly = computeMonthlyVolume(sites, 18);
@@ -23,8 +23,6 @@ export async function GET() {
     const outstandingAR = sites.reduce((s, x) => s + (x.unpaid ?? 0), 0);
 
     const dataContext = `
-You are a business consultant for Builds 'n Lenses Media, a real estate photography company in Scottsdale, AZ.
-
 BUSINESS DATA SUMMARY:
 - Total shoots in history: ${totalSites}
 - Outstanding AR: $${outstandingAR.toFixed(2)}
@@ -42,42 +40,49 @@ SEASONALITY INDEX (100 = average month, >100 = above average demand):
 ${seasonality.map((s) => `  ${s.month}: ${s.index}`).join(", ")}
 `;
 
-    const stream = anthropic.messages.stream({
-      model: "claude-opus-4-6",
-      max_tokens: 2000,
-      thinking: { type: "adaptive" },
-      system: `You are a sharp business consultant specializing in real estate photography companies.
-Provide concise, actionable insights. Use bullet points. Be specific with numbers.
-Focus on what the business owner can actually do to grow revenue.`,
-      messages: [
-        {
-          role: "user",
-          content: `${dataContext}
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const anthropicStream = anthropic.messages.stream({
+            model: "claude-opus-4-6",
+            max_tokens: 2000,
+            system: "You are a sharp business consultant specializing in real estate photography companies. Provide concise, actionable insights. Use bullet points. Be specific with numbers. Focus on what the business owner can actually do to grow revenue.",
+            messages: [
+              {
+                role: "user",
+                content: dataContext + "\n\nBased on this data, provide a structured analysis with:\n\n1. **Top Performing Bundles** — What's selling best and why this makes sense\n2. **Pricing Opportunities** — Which services/bundles could command higher prices (seasonal or market-based)\n3. **Underutilized Services** — What's undersold that could grow revenue\n4. **Bundle Recommendations** — 2-3 specific new bundles to test\n5. **Seasonal Strategy** — When to push which services based on the demand patterns\n\nBe specific, reference the actual numbers, and keep it under 500 words total.",
+              },
+            ],
+          });
 
-Based on this data, provide a structured analysis with:
-
-1. **Top Performing Bundles** — What's selling best and why this makes sense
-2. **Pricing Opportunities** — Which services/bundles could command higher prices (seasonal or market-based)
-3. **Underutilized Services** — What's undersold that could grow revenue
-4. **Bundle Recommendations** — 2-3 specific new bundles to test
-5. **Seasonal Strategy** — When to push which services based on the demand patterns
-
-Be specific, reference the actual numbers, and keep it under 500 words total.`,
-        },
-      ],
+          for await (const event of anthropicStream) {
+            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+              controller.enqueue(encoder.encode(event.delta.text));
+            }
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          controller.enqueue(encoder.encode("\n\nERROR: " + msg));
+        } finally {
+          controller.close();
+        }
+      },
     });
 
-    const message = await stream.finalMessage();
-
-    // Extract text from content blocks (skip thinking blocks)
-    const text = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
-
-    return NextResponse.json({ insights: text, generatedAt: new Date().toISOString() });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Generated-At": new Date().toISOString(),
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
