@@ -279,6 +279,22 @@ export function computeUpgradeRates(sites: HdphSite[]): UpgradeRate[] {
   });
 }
 
+// ─── Agent on Camera orders ───────────────────────────────────────────────────
+
+export function getAgentOnCameraSites(sites: HdphSite[]): HdphSite[] {
+  return sites
+    .filter((site) =>
+      site.media.some(
+        (m) => m.type === "video" && m.name.toLowerCase().includes("agent on camera")
+      )
+    )
+    .sort((a, b) => {
+      const da = parseHdphDate(a.created);
+      const db = parseHdphDate(b.created);
+      return (db?.getTime() ?? 0) - (da?.getTime() ?? 0);
+    });
+}
+
 // ─── Seasonality index (relative to yearly average) ──────────────────────────
 
 export function computeSeasonality(sites: HdphSite[]): { month: string; index: number }[] {

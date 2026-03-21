@@ -4,6 +4,7 @@ import { BundlesPanel } from "@/components/panels/BundlesPanel";
 import { ClientsPanel } from "@/components/panels/ClientsPanel";
 import { InsightsPanel } from "@/components/panels/InsightsPanel";
 import { PackagesPanel } from "@/components/panels/PackagesPanel";
+import { AgentOnCameraPanel } from "@/components/panels/AgentOnCameraPanel";
 
 export default function DashboardPage() {
   return (
@@ -16,6 +17,11 @@ export default function DashboardPage() {
       {/* Package tiers — full width */}
       <div className="mb-8">
         <PackagesPanel />
+      </div>
+
+      {/* Agent on Camera orders — full width */}
+      <div className="mb-8">
+        <AgentOnCameraPanel />
       </div>
 
       {/* 2-column grid for data panels */}
