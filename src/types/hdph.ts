@@ -103,3 +103,20 @@ export interface ClientActivity {
   siteCount: number;
   lastSite?: string;
 }
+
+export type PackageTier = "Gold" | "Silver" | "Bronze" | "À La Carte";
+
+export interface PackageStat {
+  tier: PackageTier;
+  count: number;
+  pct: number;
+}
+
+export interface UpgradeRate {
+  tier: PackageTier;
+  total: number;
+  agentOnCamera: number;
+  additionalPhotos: number;
+  agentOnCameraPct: number;
+  additionalPhotosPct: number;
+}

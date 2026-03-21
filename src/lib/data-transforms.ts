@@ -5,6 +5,9 @@ import type {
   ServiceCount,
   MonthlyVolume,
   ClientActivity,
+  PackageTier,
+  PackageStat,
+  UpgradeRate,
 } from "@/types/hdph";
 
 // ─── Service detection ────────────────────────────────────────────────────────
@@ -181,6 +184,99 @@ export function computeClientActivity(sites: HdphSite[]): ClientActivity[] {
 
 export function computeOutstandingAR(sites: HdphSite[]): number {
   return sites.reduce((sum, s) => sum + (s.unpaid ?? 0), 0);
+}
+
+// ─── Package tier detection ───────────────────────────────────────────────────
+//
+// Bronze = Photos + Drone + Floor Plan (no video, no 3D tour)
+// Silver = Photos + Drone + Floor Plan + 3D Tour (no video)
+// Gold   = Photos + Drone + Floor Plan + Video (video is included in Gold base)
+// NOTE: A Silver site that added the video add-on will be classified as Gold
+// because the API doesn't store which package was ordered.
+
+export function detectPackage(site: HdphSite): PackageTier {
+  const media = site.media ?? [];
+  let hasPhotos = false;
+  let hasDrone = false;
+  let hasFloorPlan = false;
+  let hasVideo = false;
+  let has3dTour = false;
+
+  for (const m of media) {
+    const name = (m.name ?? "").toLowerCase();
+    if (m.type === "still") {
+      hasPhotos = true;
+      if (name.includes("aerial") || name.includes("drone")) hasDrone = true;
+    } else if (m.type === "video") {
+      hasVideo = true;
+    } else if (m.type === "floorplan") {
+      hasFloorPlan = true;
+    } else if (m.type === "pan360" || m.type === "pan") {
+      has3dTour = true;
+    } else if (
+      m.type === "embed" &&
+      (name.includes("3d") || name.includes("matterport") || name.includes("zillow"))
+    ) {
+      has3dTour = true;
+    }
+  }
+
+  if (hasPhotos && hasDrone && hasFloorPlan && hasVideo) return "Gold";
+  if (hasPhotos && hasDrone && hasFloorPlan && has3dTour) return "Silver";
+  if (hasPhotos && hasDrone && hasFloorPlan) return "Bronze";
+  return "À La Carte";
+}
+
+export function computePackageBreakdown(sites: HdphSite[]): PackageStat[] {
+  const counts: Record<PackageTier, number> = {
+    Bronze: 0,
+    Silver: 0,
+    Gold: 0,
+    "À La Carte": 0,
+  };
+  for (const site of sites) {
+    counts[detectPackage(site)]++;
+  }
+  const total = sites.length || 1;
+  return (["Bronze", "Silver", "Gold", "À La Carte"] as PackageTier[]).map((tier) => ({
+    tier,
+    count: counts[tier],
+    pct: Math.round((counts[tier] / total) * 100 * 10) / 10,
+  }));
+}
+
+export function computeUpgradeRates(sites: HdphSite[]): UpgradeRate[] {
+  const stats: Record<PackageTier, { total: number; agentOnCamera: number; additionalPhotos: number }> = {
+    Bronze: { total: 0, agentOnCamera: 0, additionalPhotos: 0 },
+    Silver: { total: 0, agentOnCamera: 0, additionalPhotos: 0 },
+    Gold: { total: 0, agentOnCamera: 0, additionalPhotos: 0 },
+    "À La Carte": { total: 0, agentOnCamera: 0, additionalPhotos: 0 },
+  };
+
+  for (const site of sites) {
+    const tier = detectPackage(site);
+    const s = stats[tier];
+    s.total++;
+    const names = (site.media ?? []).map((m) => (m.name ?? "").toLowerCase());
+    if (names.some((n) => n.includes("agent on camera") || n.includes("agent-on-camera"))) {
+      s.agentOnCamera++;
+    }
+    if (names.some((n) => n.includes("additional"))) {
+      s.additionalPhotos++;
+    }
+  }
+
+  return (["Bronze", "Silver", "Gold"] as PackageTier[]).map((tier) => {
+    const s = stats[tier];
+    return {
+      tier,
+      total: s.total,
+      agentOnCamera: s.agentOnCamera,
+      additionalPhotos: s.additionalPhotos,
+      agentOnCameraPct: s.total > 0 ? Math.round((s.agentOnCamera / s.total) * 100) : 0,
+      additionalPhotosPct: s.total > 0 ? Math.round((s.additionalPhotos / s.total) * 100) : 0,
+    };
+  });
 }
 
 // ─── Seasonality index (relative to yearly average) ──────────────────────────

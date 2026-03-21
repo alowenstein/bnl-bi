@@ -3,6 +3,7 @@ import { VolumePanel } from "@/components/panels/VolumePanel";
 import { BundlesPanel } from "@/components/panels/BundlesPanel";
 import { ClientsPanel } from "@/components/panels/ClientsPanel";
 import { InsightsPanel } from "@/components/panels/InsightsPanel";
+import { PackagesPanel } from "@/components/panels/PackagesPanel";
 
 export default function DashboardPage() {
   return (
@@ -10,6 +11,11 @@ export default function DashboardPage() {
       {/* AI Insights — full width at top */}
       <div className="mb-8">
         <InsightsPanel />
+      </div>
+
+      {/* Package tiers — full width */}
+      <div className="mb-8">
+        <PackagesPanel />
       </div>
 
       {/* 2-column grid for data panels */}
