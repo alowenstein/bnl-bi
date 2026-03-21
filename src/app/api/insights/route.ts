@@ -1,26 +1,22 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { hdphFetch } from "@/lib/hdph-client";
-import {
-  computeBundles,
-  computeServiceFrequency,
-  computeMonthlyVolume,
-  computeSeasonality,
-} from "@/lib/data-transforms";
-import type { HdphSite } from "@/types/hdph";
 
 export const maxDuration = 60;
 
 const anthropic = new Anthropic();
 
-export async function GET() {
+interface InsightsPayload {
+  totalSites: number;
+  outstandingAR: number;
+  bundles: { bundle: string; count: number; pct: number }[];
+  services: { service: string; count: number; pct: number }[];
+  monthly: { label: string; count: number }[];
+  seasonality: { month: string; index: number }[];
+}
+
+export async function POST(req: Request) {
   try {
-    const sites = await hdphFetch<HdphSite[]>("/sites");
-    const bundles = computeBundles(sites).slice(0, 10);
-    const services = computeServiceFrequency(sites);
-    const monthly = computeMonthlyVolume(sites, 18);
-    const seasonality = computeSeasonality(sites);
-    const totalSites = sites.length;
-    const outstandingAR = sites.reduce((s, x) => s + (x.unpaid ?? 0), 0);
+    const payload: InsightsPayload = await req.json();
+    const { totalSites, outstandingAR, bundles, services, monthly, seasonality } = payload;
 
     const dataContext = `
 BUSINESS DATA SUMMARY:

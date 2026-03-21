@@ -1,10 +1,12 @@
 "use client";
 
 import { useInsights } from "@/hooks/useInsights";
+import { useSites } from "@/hooks/useSites";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 export function InsightsPanel() {
-  const { insights, generatedAt, isLoading, error, refresh } = useInsights();
+  const { sites } = useSites();
+  const { insights, generatedAt, isLoading, error, refresh } = useInsights(sites);
 
   return (
     <section className="space-y-4">
@@ -28,8 +30,7 @@ export function InsightsPanel() {
 
         {error && (
           <div className="rounded-lg bg-red-50 p-4 text-sm text-red-600">
-            Could not generate insights. Make sure <code className="font-mono">ANTHROPIC_API_KEY</code> is set in{" "}
-            <code className="font-mono">.env.local</code>.
+            Could not generate insights: {error}
           </div>
         )}
 

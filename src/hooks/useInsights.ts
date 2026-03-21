@@ -1,14 +1,24 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import type { HdphSite } from "@/types/hdph";
+import {
+  computeBundles,
+  computeServiceFrequency,
+  computeMonthlyVolume,
+  computeSeasonality,
+  computeOutstandingAR,
+} from "@/lib/data-transforms";
 
-export function useInsights() {
+export function useInsights(sites: HdphSite[]) {
   const [insights, setInsights] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const loadedForRef = useRef<number>(0); // track sites.length we last loaded for
 
-  const load = useCallback(async () => {
-    // Cancel any in-flight request
+  const load = useCallback(async (sitesSnapshot: HdphSite[]) => {
+    if (sitesSnapshot.length === 0) return;
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -18,7 +28,21 @@ export function useInsights() {
     setInsights(null);
 
     try {
-      const res = await fetch("/api/insights", { signal: controller.signal });
+      const payload = {
+        totalSites: sitesSnapshot.length,
+        outstandingAR: computeOutstandingAR(sitesSnapshot),
+        bundles: computeBundles(sitesSnapshot).slice(0, 10),
+        services: computeServiceFrequency(sitesSnapshot),
+        monthly: computeMonthlyVolume(sitesSnapshot, 18),
+        seasonality: computeSeasonality(sitesSnapshot),
+      };
+
+      const res = await fetch("/api/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
 
       if (!res.ok) {
         const body = await res.text();
@@ -37,7 +61,7 @@ export function useInsights() {
         const { done, value } = await reader.read();
         if (done) break;
         text += decoder.decode(value, { stream: true });
-        setInsights(text); // update UI progressively as tokens arrive
+        setInsights(text);
       }
 
       if (text.includes("ERROR:")) {
@@ -52,8 +76,18 @@ export function useInsights() {
     }
   }, []);
 
-  // Load on mount
-  useEffect(() => { load(); }, [load]);
+  // Auto-load once sites are available
+  useEffect(() => {
+    if (sites.length > 0 && loadedForRef.current === 0) {
+      loadedForRef.current = sites.length;
+      load(sites);
+    }
+  }, [sites, load]);
 
-  return { insights, generatedAt, isLoading, error, refresh: load };
+  const refresh = useCallback(() => {
+    loadedForRef.current = 0; // reset so next effect triggers
+    load(sites);
+  }, [sites, load]);
+
+  return { insights, generatedAt, isLoading, error, refresh };
 }

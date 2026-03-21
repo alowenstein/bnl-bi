@@ -2,16 +2,14 @@
 
 import { useState } from "react";
 import { useSites } from "@/hooks/useSites";
-import { useInsights } from "@/hooks/useInsights";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { refresh: refreshSites } = useSites();
-  const { refresh: refreshInsights } = useInsights();
   const [refreshing, setRefreshing] = useState(false);
 
   async function handleRefresh() {
     setRefreshing(true);
-    await Promise.all([refreshSites(), refreshInsights()]);
+    await refreshSites();
     setRefreshing(false);
   }
 
