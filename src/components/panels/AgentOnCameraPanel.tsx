@@ -32,16 +32,16 @@ function EmailModal({ draft, onClose }: { draft: EmailDraft; onClose: () => void
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-gray-800 shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b">
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <p className="text-xs text-gray-400 mb-0.5">To: {draft.to}</p>
-            <p className="font-semibold text-gray-800 text-sm">{draft.subject}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">To: {draft.to}</p>
+            <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{draft.subject}</p>
           </div>
           <button
             onClick={onClose}
-            className="shrink-0 text-gray-400 hover:text-gray-600 text-xl leading-none mt-0.5"
+            className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none mt-0.5"
           >
             ×
           </button>
@@ -51,14 +51,14 @@ function EmailModal({ draft, onClose }: { draft: EmailDraft; onClose: () => void
         <textarea
           readOnly
           value={draft.textBody}
-          className="flex-1 resize-none font-mono text-xs text-gray-700 leading-relaxed p-6 bg-gray-50 overflow-y-auto outline-none"
+          className="flex-1 resize-none font-mono text-xs text-gray-700 dark:text-gray-300 leading-relaxed p-6 bg-gray-50 dark:bg-gray-900 overflow-y-auto outline-none"
         />
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+            className="rounded-lg px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             Close
           </button>
@@ -88,8 +88,8 @@ function AocRow({ site }: { site: HdphSite }) {
     : "—";
 
   const specs = [
-    site.beds  ? `${site.beds}bd`                    : null,
-    site.baths ? `${site.baths}ba`                   : null,
+    site.beds  ? `${site.beds}bd`                     : null,
+    site.baths ? `${site.baths}ba`                    : null,
     site.sqft  ? `${site.sqft.toLocaleString()} sqft` : null,
   ].filter(Boolean).join(" · ");
 
@@ -125,23 +125,23 @@ function AocRow({ site }: { site: HdphSite }) {
 
   return (
     <>
-      <tr className="border-b border-gray-50 hover:bg-gray-50">
-        <td className="py-2 pr-3 text-xs text-gray-400 whitespace-nowrap">{dateLabel}</td>
+      <tr className="border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+        <td className="py-2 pr-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{dateLabel}</td>
         <td className="py-2 pr-3">
-          <p className="font-medium text-gray-800 text-sm">{site.address}</p>
-          <p className="text-xs text-gray-400">{site.city}, {site.state}</p>
+          <p className="font-medium text-gray-800 dark:text-gray-200 text-sm">{site.address}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{site.city}, {site.state}</p>
         </td>
         <td className="py-2 pr-3">
-          <p className="text-sm text-gray-700">{site.user.name}</p>
-          <p className="text-xs text-gray-400">{site.user.email}</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{site.user.name}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{site.user.email}</p>
         </td>
-        <td className="py-2 pr-4 text-xs text-gray-500 whitespace-nowrap">{specs || "—"}</td>
+        <td className="py-2 pr-4 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{specs || "—"}</td>
         <td className="py-2">
           {err && <p className="text-xs text-red-500 mb-1">{err}</p>}
           <button
             onClick={handleDraft}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+            className="flex items-center gap-1.5 rounded-lg bg-purple-50 dark:bg-purple-950 px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
           >
             {loading ? (
               <>
@@ -172,20 +172,20 @@ export function AgentOnCameraPanel() {
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-3">
-        <h2 className="text-lg font-semibold text-gray-800">Agent on Camera Orders</h2>
-        <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-700">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Agent on Camera Orders</h2>
+        <span className="rounded-full bg-purple-100 dark:bg-purple-950 px-2.5 py-0.5 text-xs font-semibold text-purple-700 dark:text-purple-300">
           {aocSites.length}
         </span>
       </div>
 
       {aocSites.length === 0 ? (
-        <p className="text-sm text-gray-400 italic">No Agent on Camera orders found.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 italic">No Agent on Camera orders found.</p>
       ) : (
-        <div className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="rounded-xl bg-white dark:bg-gray-800 p-4 shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-xs text-gray-400">
+                <tr className="border-b border-gray-200 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">
                   <th className="pb-2 text-left font-medium">Date</th>
                   <th className="pb-2 text-left font-medium">Address</th>
                   <th className="pb-2 text-left font-medium">Agent</th>

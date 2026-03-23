@@ -24,7 +24,7 @@ export function ClientsPanel() {
 
   return (
     <section className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-800">Client Activity</h2>
+      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Client Activity</h2>
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Total Clients" value={totalClients} accent="blue" />
         <StatCard
@@ -33,20 +33,15 @@ export function ClientsPanel() {
           sub={`${repeatClients} clients with 2+ shoots`}
           accent="green"
         />
-        <StatCard
-          label="Top Client"
-          value={topClient?.siteCount ?? 0}
-          sub={topClient?.name ?? "—"}
-          accent="purple"
-        />
+        <StatCard label="Top Client" value={topClient?.siteCount ?? 0} sub={topClient?.name ?? "—"} accent="purple" />
       </div>
 
-      <div className="rounded-xl bg-white p-4 shadow-sm">
-        <p className="mb-3 text-sm font-medium text-gray-500">Top 20 Clients by Shoot Volume</p>
+      <div className="rounded-xl bg-white dark:bg-gray-800 p-4 shadow-sm">
+        <p className="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Top 20 Clients by Shoot Volume</p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-xs text-gray-400">
+              <tr className="border-b border-gray-200 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">
                 <th className="pb-2 text-left font-medium">#</th>
                 <th className="pb-2 text-left font-medium">Client</th>
                 <th className="pb-2 text-left font-medium">Brokerage</th>
@@ -55,14 +50,14 @@ export function ClientsPanel() {
             </thead>
             <tbody>
               {clients.map((c, i) => (
-                <tr key={c.uid} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="py-2 pr-3 text-xs text-gray-400">{i + 1}</td>
+                <tr key={c.uid} className="border-b border-gray-50 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <td className="py-2 pr-3 text-xs text-gray-400 dark:text-gray-500">{i + 1}</td>
                   <td className="py-2 pr-3">
-                    <p className="font-medium text-gray-800">{c.name}</p>
-                    <p className="text-xs text-gray-400">{c.email}</p>
+                    <p className="font-medium text-gray-800 dark:text-gray-200">{c.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{c.email}</p>
                   </td>
-                  <td className="py-2 pr-3 text-xs text-gray-500">{c.group ?? "—"}</td>
-                  <td className="py-2 text-right font-semibold text-gray-800">{c.siteCount}</td>
+                  <td className="py-2 pr-3 text-xs text-gray-500 dark:text-gray-400">{c.group ?? "—"}</td>
+                  <td className="py-2 text-right font-semibold text-gray-800 dark:text-gray-200">{c.siteCount}</td>
                 </tr>
               ))}
             </tbody>

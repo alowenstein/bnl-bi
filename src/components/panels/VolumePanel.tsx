@@ -31,20 +31,20 @@ export function VolumePanel() {
 
   return (
     <section className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-800">Shoot Volume</h2>
+      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Shoot Volume</h2>
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Shoots MTD" value={mtd} accent="blue" />
         <StatCard label="Shoots YTD" value={ytd} accent="green" />
         <StatCard label="Total All Time" value={sites.length} accent="purple" />
       </div>
-      <div className="rounded-xl bg-white p-4 shadow-sm">
-        <p className="mb-3 text-sm font-medium text-gray-500">Monthly Volume (18 months)</p>
+      <div className="rounded-xl bg-white dark:bg-gray-800 p-4 shadow-sm">
+        <p className="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">Monthly Volume (18 months)</p>
         <VolumeChart data={monthly} />
       </div>
-      <div className="rounded-xl bg-white p-4 shadow-sm">
-        <p className="mb-1 text-sm font-medium text-gray-500">Seasonality Index</p>
-        <p className="mb-3 text-xs text-gray-400">
-          Peak demand: <strong>{peak?.month}</strong> (index {peak?.index})
+      <div className="rounded-xl bg-white dark:bg-gray-800 p-4 shadow-sm">
+        <p className="mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">Seasonality Index</p>
+        <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
+          Peak demand: <strong className="text-gray-600 dark:text-gray-300">{peak?.month}</strong> (index {peak?.index})
         </p>
         <SeasonalityChart data={seasonality} />
       </div>
