@@ -104,11 +104,11 @@ const MONTH_LABELS = [
 
 export function parseHdphDate(dateStr: string): Date | null {
   // Format: "3/16/2026 11:32:29 PM"
-  try {
-    return new Date(dateStr);
-  } catch {
-    return null;
-  }
+  // Note: new Date() never throws — it returns Invalid Date for bad input,
+  // so we must check isNaN rather than rely on a catch.
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 export function computeMonthlyVolume(
@@ -153,8 +153,11 @@ export function computeClientActivity(sites: HdphSite[]): ClientActivity[] {
     const existing = map.get(u.uid);
     if (existing) {
       existing.count++;
-      // Keep latest created date
-      if (site.created > existing.lastCreated) {
+      // Keep latest created date — compare as Date objects, not strings,
+      // since the "M/D/YYYY" format does not sort lexicographically.
+      const siteTime = parseHdphDate(site.created)?.getTime() ?? 0;
+      const existingTime = parseHdphDate(existing.lastCreated)?.getTime() ?? 0;
+      if (siteTime > existingTime) {
         existing.lastCreated = site.created;
       }
     } else {

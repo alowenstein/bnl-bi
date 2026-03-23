@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSites } from "@/hooks/useSites";
 import { getAgentOnCameraSites, parseHdphDate } from "@/lib/data-transforms";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -26,7 +27,7 @@ function EmailModal({ draft, onClose }: { draft: EmailDraft; onClose: () => void
     });
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -69,7 +70,8 @@ function EmailModal({ draft, onClose }: { draft: EmailDraft; onClose: () => void
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
