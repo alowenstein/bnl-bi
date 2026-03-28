@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JCC Program Schedule</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #333; line-height: 1.6; margin: 0; padding: 0; background: #f4f4f4; }
+    .wrapper { max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .header { background: #1a5276; color: #fff; padding: 24px 32px; }
+    .header h1 { margin: 0; font-size: 22px; }
+    .body { padding: 32px; }
+    .plan-box { background: #eaf4fb; border-left: 4px solid #1a5276; padding: 14px 18px; border-radius: 4px; margin: 20px 0; }
+    .plan-box p { margin: 4px 0; }
+    .footer { background: #f0f0f0; padding: 16px 32px; font-size: 13px; color: #777; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>JCC Program Schedule Update</h1>
+    </div>
+    <div class="body">
+      <p>Dear Parent/Guardian,</p>
+      <p>
+        We are reaching out regarding <strong>{{student_name}}</strong>'s enrollment in our JCC program.
+        Please review the schedule details below.
+      </p>
+
+      <div class="plan-box">
+        <p><strong>Current Plan</strong></p>
+        <p>{{existing_plan}}</p>
+        <p><strong>Total Hours:</strong> {{total_hours}}</p>
+      </div>
+
+      <p>
+        If you have any questions or need to make changes to this schedule, please don't hesitate
+        to reach out to us. We're happy to help.
+      </p>
+
+      <p>Warm regards,<br /><strong>The JCC Team</strong></p>
+    </div>
+    <div class="footer">
+      Jewish Community Center &mdash; Program Administration
+    </div>
+  </div>
+</body>
+</html>
