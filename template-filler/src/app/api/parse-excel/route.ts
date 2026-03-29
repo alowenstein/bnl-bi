@@ -12,11 +12,13 @@ export async function POST(req: NextRequest) {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  const rows = parseExcelBuffer(buffer);
-
-  if (rows.length === 0) {
-    return NextResponse.json({ error: 'No data rows found in the spreadsheet.' }, { status: 422 });
+  try {
+    const { rows, warnings } = parseExcelBuffer(buffer);
+    return NextResponse.json({ rows, warnings });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to parse file.' },
+      { status: 422 }
+    );
   }
-
-  return NextResponse.json({ rows });
 }

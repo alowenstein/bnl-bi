@@ -6,6 +6,12 @@ export interface StudentRow {
   totalHours: string | number;
 }
 
+export interface RowWarning {
+  row: number;
+  field: string;
+  message: string;
+}
+
 export interface SendResult {
   email: string;
   studentName: string;

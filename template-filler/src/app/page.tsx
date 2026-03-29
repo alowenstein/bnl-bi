@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { StudentRow } from '@/types/student';
+import { StudentRow, RowWarning } from '@/types/student';
 
 const DEFAULT_SUBJECT = 'JCC Program Schedule Update for {{student_name}}';
 
@@ -47,6 +47,7 @@ export default function Home() {
   const [subject, setSubject] = useState(DEFAULT_SUBJECT);
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
   const [parseError, setParseError] = useState('');
+  const [warnings, setWarnings] = useState<RowWarning[]>([]);
   const [parsing, setParsing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -57,6 +58,7 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (!file) return;
     setParseError('');
+    setWarnings([]);
     setParsing(true);
     const formData = new FormData();
     formData.append('file', file);
@@ -68,6 +70,7 @@ export default function Home() {
       return;
     }
     setRows(data.rows);
+    setWarnings(data.warnings ?? []);
     setSelected(new Set(data.rows.map((_: StudentRow, i: number) => i)));
   }, []);
 
@@ -112,6 +115,8 @@ export default function Home() {
   };
 
   const previewStudent = previewIndex !== null ? rows[previewIndex] : null;
+  // Build a set of row numbers (1-based) that have warnings
+  const warnedRows = new Set(warnings.map((w) => w.row - 2)); // convert back to 0-based index
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -138,7 +143,26 @@ export default function Home() {
             <p className="text-xs text-slate-400 mt-1">Columns: Student Name · Parent Email · Drop-off Time · Pick-up Time · Total Hours</p>
           </div>
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
-          {parseError && <p className="mt-3 text-sm text-red-600">{parseError}</p>}
+          {parseError && (
+            <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-700 font-medium">Could not read file</p>
+              <p className="text-sm text-red-600 mt-0.5 whitespace-pre-line">{parseError}</p>
+            </div>
+          )}
+          {warnings.length > 0 && (
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800 font-medium mb-1">
+                {warnings.length} warning{warnings.length > 1 ? 's' : ''} — rows with issues will still be included
+              </p>
+              <ul className="space-y-0.5">
+                {warnings.map((w, i) => (
+                  <li key={i} className="text-xs text-amber-700">
+                    Row {w.row} · <span className="font-medium">{w.field}</span>: {w.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
         {/* Step 2: Template */}
@@ -200,11 +224,14 @@ export default function Home() {
                 </thead>
                 <tbody>
                   {rows.map((row, i) => (
-                    <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={i} className={`border-b border-slate-100 hover:bg-slate-50 ${warnedRows.has(i) ? 'bg-amber-50/50' : ''}`}>
                       <td className="py-2 pr-4">
                         <input type="checkbox" checked={selected.has(i)} onChange={() => toggleRow(i)} className="cursor-pointer" />
                       </td>
-                      <td className="py-2 pr-4 font-medium text-slate-800">{row.studentName}</td>
+                      <td className="py-2 pr-4 font-medium text-slate-800">
+                        {warnedRows.has(i) && <span className="text-amber-500 mr-1" title="This row has warnings">⚠</span>}
+                        {row.studentName || <span className="text-slate-400 italic">missing</span>}
+                      </td>
                       <td className="py-2 pr-4 text-slate-600">{row.parentEmail}</td>
                       <td className="py-2 pr-4 text-slate-600">{row.dropOffTime}</td>
                       <td className="py-2 pr-4 text-slate-600">{row.pickUpTime}</td>
