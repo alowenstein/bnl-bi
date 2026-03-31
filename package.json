@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "emailer": "node --loader ts-node/esm --env-file=.env.local scripts/agent-on-camera-emailer.ts"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "emailer": "node --loader ts-node/esm --env-file=.env.local scripts/agent-on-camera-emailer.ts",
+    "listing-checker": "node --loader ts-node/esm --env-file=.env.local scripts/listing-status-checker.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
