@@ -248,7 +248,9 @@ export function ListingStatusPanel() {
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
   if (error)     return <ErrorBanner message={error.message} />;
 
-  const visible   = changes.filter((c) => !dismissed.has(c.id));
+  const visible = changes
+    .filter((c) => !dismissed.has(c.id))
+    .sort((a, b) => new Date(a.detectedAt).getTime() - new Date(b.detectedAt).getTime());
   const nDismissed = dismissed.size;
 
   return (
