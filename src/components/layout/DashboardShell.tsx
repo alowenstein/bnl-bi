@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useSites } from "@/hooks/useSites";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -21,14 +22,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <h1 className="text-xl font-bold text-gray-900">Builds &apos;n Lenses BI</h1>
             <p className="text-xs text-gray-400">Real estate photography analytics</p>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-          >
-            <span className={refreshing ? "animate-spin" : ""}>↻</span>
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/scholar"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Scholar Search
+            </Link>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              <span className={refreshing ? "animate-spin" : ""}>↻</span>
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>

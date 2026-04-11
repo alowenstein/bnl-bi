@@ -9,11 +9,15 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "emailer": "node --loader ts-node/esm --env-file=.env.local scripts/agent-on-camera-emailer.ts"
+    "emailer": "tsx --env-file=.env.local scripts/agent-on-camera-emailer.ts",
+    "listing-checker": "tsx --env-file=.env.local scripts/listing-status-checker.ts",
+    "red-reengager": "env -u ANTHROPIC_API_KEY tsx --env-file=.env.local scripts/red-client-reengager.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@types/nodemailer": "^7.0.11",
+    "@vercel/kv": "^3.0.0",
+    "composio-core": "^0.5.39",
     "next": "16.2.0",
     "nodemailer": "^8.0.3",
     "react": "19.2.4",
@@ -31,7 +35,8 @@
     "eslint-config-next": "16.2.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.4"
   }
 }
