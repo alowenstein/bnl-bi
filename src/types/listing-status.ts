@@ -17,7 +17,9 @@ export type ChangeType =
 
 export interface ListingSnapshot {
   sid: number;
+  bid: number;
   address: string;
+  address2: string | null;   // unit / suite / apt
   city: string;
   state: string;
   zip: string;
@@ -30,6 +32,7 @@ export interface ListingSnapshot {
   lastStatus: ListingStatus;
   lastPrice: number | null;
   listingUrl: string;
+  hdphUrl: string;            // link to HDPhotoHub admin page for this shoot
   photoUrl: string | null;    // first still photo from HDPH media[]
 }
 
@@ -37,6 +40,7 @@ export interface ListingChange {
   id: string;             // `${sid}-${detectedAt}`
   sid: number;
   address: string;
+  address2: string | null;   // unit / suite / apt
   city: string;
   state: string;
   mls: string | null;
@@ -51,6 +55,7 @@ export interface ListingChange {
   priceDelta: number | null;  // negative = price drop
   detectedAt: string;         // ISO timestamp
   listingUrl: string;
+  hdphUrl: string;            // link to HDPhotoHub admin page for this shoot
   photoUrl: string | null;    // first still photo from HDPH media[]
 }
 

@@ -194,7 +194,7 @@ function ChangeCard({
 
         {/* Address */}
         <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
-          {change.address}
+          {change.address}{change.address2 ? ` ${change.address2}` : ""}
         </p>
         <p className="text-xs text-gray-400 mb-1">
           {change.city}, {change.state} · {mlsText}
@@ -216,13 +216,23 @@ function ChangeCard({
           {change.agentPhone && <span className="ml-1 text-gray-400">· {change.agentPhone}</span>}
         </p>
 
-        {/* Message preview toggle */}
-        <button
-          onClick={() => setMsgOpen((o) => !o)}
-          className="mt-2 text-xs text-blue-500 hover:text-blue-700 underline"
-        >
-          {msgOpen ? "Hide message" : "Preview message"}
-        </button>
+        {/* Links row */}
+        <div className="mt-2 flex items-center gap-3">
+          <a
+            href={change.hdphUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            HD Photo Hub ↗
+          </a>
+          <button
+            onClick={() => setMsgOpen((o) => !o)}
+            className="text-xs text-blue-500 hover:text-blue-700 underline"
+          >
+            {msgOpen ? "Hide message" : "Preview message"}
+          </button>
+        </div>
 
         {msgOpen && (
           <div className="mt-2 rounded-lg bg-gray-50 dark:bg-gray-700 p-3 text-xs text-gray-700 dark:text-gray-300 leading-relaxed">

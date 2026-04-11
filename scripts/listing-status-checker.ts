@@ -27,8 +27,8 @@ type ChangeType =
   | "price_change" | "back_on_market" | "off_market";
 
 interface ListingSnapshot {
-  sid: number;
-  address: string; city: string; state: string; zip: string;
+  sid: number; bid: number;
+  address: string; address2: string | null; city: string; state: string; zip: string;
   mls: string | null;
   agentName: string; agentEmail: string; agentPhone: string | null;
   shotDate: string;
@@ -36,13 +36,14 @@ interface ListingSnapshot {
   lastStatus: ListingStatus;
   lastPrice: number | null;
   listingUrl: string;
+  hdphUrl: string;
   photoUrl: string | null;
 }
 
 interface ListingChange {
   id: string;
   sid: number;
-  address: string; city: string; state: string;
+  address: string; address2: string | null; city: string; state: string;
   mls: string | null;
   agentName: string; agentEmail: string; agentPhone: string | null;
   changeType: ChangeType;
@@ -51,6 +52,7 @@ interface ListingChange {
   priceDelta: number | null;
   detectedAt: string;
   listingUrl: string;
+  hdphUrl: string;
   photoUrl: string | null;
 }
 
@@ -91,8 +93,8 @@ const CHANGE_LOG_FILE = path.join(__dirname, "../data/listing-change-log.json");
 
 interface HdphUser { uid: number; name: string; email: string; phone?: string; }
 interface HdphSite {
-  sid: number; status: string; purchased: string; created: string;
-  address: string; city?: string; state?: string; zip?: string;
+  sid: number; bid: number; status: string; purchased: string; created: string;
+  address: string; address2?: string; city?: string; state?: string; zip?: string;
   mls?: string; price?: number;
   user: HdphUser;
   media: { mid: number; type: string; name: string; hidden: boolean; url?: string }[];
@@ -269,8 +271,8 @@ function mockRealtyApiListing(site: HdphSite): RealtyApiResult {
 async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | null> {
   if (REALTYAPI_MOCK) return mockRealtyApiListing(site);
 
-  // Build full address string for lookup
-  const fullAddress = [site.address, site.city, site.state, site.zip]
+  // Build full address string for lookup (include unit/address2 for condos)
+  const fullAddress = [site.address, site.address2, site.city, site.state, site.zip]
     .filter(Boolean).join(" ");
 
   const url = `${REALTYAPI_BASE}/pro/byaddress?propertyaddress=${encodeURIComponent(fullAddress)}`;
@@ -467,16 +469,18 @@ async function main() {
 
     const agentPhone = site.user.phone?.trim() || null;
     const photoUrl   = getFirstPhotoUrl(site);
+    const address2   = site.address2?.trim() || null;
+    const hdphUrl    = `${HDPH_BASE.replace("/api/v1", "")}/admin/site.aspx?nSiteID=${site.sid}`;
 
     if (!existing) {
       snapshotStore.snapshots[site.sid] = {
-        sid: site.sid, address: site.address,
+        sid: site.sid, bid: site.bid, address: site.address, address2,
         city: site.city ?? "", state: site.state ?? "", zip: site.zip ?? "",
         mls: site.mls ?? null,
         agentName: site.user.name, agentEmail: site.user.email, agentPhone,
         shotDate: site.created, lastChecked: now,
         lastStatus: result.status, lastPrice: result.price,
-        listingUrl: result.listingUrl, photoUrl,
+        listingUrl: result.listingUrl, hdphUrl, photoUrl,
       };
 
       // Backfill: on first sight, if the listing is already in a noteworthy
@@ -486,7 +490,7 @@ async function main() {
       if (backfillType) {
         newChanges.push({
           id: `${site.sid}-${now}`,
-          sid: site.sid, address: site.address,
+          sid: site.sid, address: site.address, address2,
           city: site.city ?? "", state: site.state ?? "",
           mls: site.mls ?? null,
           agentName: site.user.name, agentEmail: site.user.email, agentPhone,
@@ -494,7 +498,7 @@ async function main() {
           previousStatus: "For Sale", currentStatus: result.status,
           previousPrice: result.price, currentPrice: result.price,
           priceDelta: null,
-          detectedAt: now, listingUrl: result.listingUrl, photoUrl,
+          detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
         });
         console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
       } else {
@@ -508,7 +512,7 @@ async function main() {
     if (changeType) {
       newChanges.push({
         id: `${site.sid}-${now}`,
-        sid: site.sid, address: site.address,
+        sid: site.sid, address: site.address, address2,
         city: site.city ?? "", state: site.state ?? "",
         mls: site.mls ?? null,
         agentName: site.user.name, agentEmail: site.user.email, agentPhone,
@@ -517,7 +521,7 @@ async function main() {
         previousPrice: existing.lastPrice,   currentPrice: result.price,
         priceDelta: result.price !== null && existing.lastPrice !== null
           ? result.price - existing.lastPrice : null,
-        detectedAt: now, listingUrl: result.listingUrl, photoUrl,
+        detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
       });
       console.log(`   🔔 Change: ${CHANGE_LABELS[changeType]}`);
     } else {
@@ -526,7 +530,7 @@ async function main() {
 
     snapshotStore.snapshots[site.sid] = {
       ...existing,
-      agentPhone, photoUrl,
+      agentPhone, address2, hdphUrl, photoUrl,
       lastChecked: now, lastStatus: result.status,
       lastPrice: result.price, listingUrl: result.listingUrl,
     };
