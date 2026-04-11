@@ -260,7 +260,7 @@ export function ListingStatusPanel() {
 
   const visible = changes
     .filter((c) => !dismissed.has(c.id))
-    .sort((a, b) => new Date(a.detectedAt).getTime() - new Date(b.detectedAt).getTime());
+    .sort((a, b) => new Date(a.shotDate ?? a.detectedAt).getTime() - new Date(b.shotDate ?? b.detectedAt).getTime());
   const nDismissed = dismissed.size;
 
   return (

@@ -53,6 +53,7 @@ export interface ListingChange {
   previousPrice: number | null;
   currentPrice: number | null;
   priceDelta: number | null;  // negative = price drop
+  shotDate: string;           // when the photo shoot happened (site.created)
   detectedAt: string;         // ISO timestamp
   listingUrl: string;
   hdphUrl: string;            // link to HDPhotoHub admin page for this shoot

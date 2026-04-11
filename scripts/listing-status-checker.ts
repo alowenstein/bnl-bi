@@ -50,6 +50,7 @@ interface ListingChange {
   previousStatus: ListingStatus; currentStatus: ListingStatus;
   previousPrice: number | null;  currentPrice: number | null;
   priceDelta: number | null;
+  shotDate: string;
   detectedAt: string;
   listingUrl: string;
   hdphUrl: string;
@@ -498,7 +499,7 @@ async function main() {
           previousStatus: "For Sale", currentStatus: result.status,
           previousPrice: result.price, currentPrice: result.price,
           priceDelta: null,
-          detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
+          shotDate: site.created, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
         });
         console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
       } else {
@@ -521,7 +522,7 @@ async function main() {
         previousPrice: existing.lastPrice,   currentPrice: result.price,
         priceDelta: result.price !== null && existing.lastPrice !== null
           ? result.price - existing.lastPrice : null,
-        detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
+        shotDate: existing.shotDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
       });
       console.log(`   🔔 Change: ${CHANGE_LABELS[changeType]}`);
     } else {
