@@ -51,6 +51,7 @@ interface ListingChange {
   previousPrice: number | null;  currentPrice: number | null;
   priceDelta: number | null;
   shotDate: string;
+  statusDate: string | null;  // "YYYY-MM-DD" when the status change happened (from Zillow history)
   detectedAt: string;
   listingUrl: string;
   hdphUrl: string;
@@ -77,6 +78,7 @@ const REALTYAPI_MOCK   = process.env.REALTYAPI_MOCK === "true";
 const REALTYAPI_BASE   = "https://zillow.realtyapi.io";
 const WINDOW_DAYS      = 60;
 const MAX_LOG_ENTRIES  = 200;
+const TEST_LIMIT       = process.env.TEST_LIMIT ? parseInt(process.env.TEST_LIMIT) : 0; // 0 = no limit
 
 const KV_URL   = process.env.KV_REST_API_URL;
 const KV_TOKEN = process.env.KV_REST_API_TOKEN;
@@ -211,6 +213,12 @@ interface RealtyApiListingSubType {
   isComingSoon?: boolean;
 }
 
+interface RealtyApiPriceHistoryEntry {
+  date: string;    // "YYYY-MM-DD"
+  price: number;
+  event: string;   // "Sold", "Pending", "Price change", "Listed for sale", etc.
+}
+
 interface RealtyApiPropertyDetails {
   homeStatus?: string;
   price?: number;
@@ -218,6 +226,7 @@ interface RealtyApiPropertyDetails {
   zpid?: number;
   contingentListingType?: string | null;
   listingSubType?: RealtyApiListingSubType;
+  priceHistory?: RealtyApiPriceHistoryEntry[] | null;
 }
 
 interface RealtyApiResponse {
@@ -229,6 +238,7 @@ interface RealtyApiResult {
   status: ListingStatus;
   price: number | null;
   listingUrl: string;
+  statusDate: string | null;  // "YYYY-MM-DD" — when the status change actually happened
 }
 
 function mapRealtyApiStatus(
@@ -255,6 +265,34 @@ function mapRealtyApiStatus(
   }
 }
 
+// Extract the most recent date for a given status event from priceHistory.
+// priceHistory is newest-first. Event keywords:
+//   Sold → "Sold"
+//   Pending / Under Contract → "Pending"
+//   Accepting Backup Offers → "Contingent" (Zillow calls it contingent)
+//   Price change → "Price change"
+//   For Sale (back on market) → "Listed for sale"
+function statusDateFromHistory(
+  history: RealtyApiPriceHistoryEntry[] | null | undefined,
+  status: ListingStatus
+): string | null {
+  if (!history?.length) return null;
+  const keywords: Record<ListingStatus, string[]> = {
+    "Sold":                    ["sold"],
+    "Pending":                 ["pending", "under contract"],
+    "Accepting Backup Offers": ["contingent", "backup"],
+    "For Sale":                ["listed for sale", "re-listed", "price change"],
+    "Off Market":              ["off market", "removed", "expired", "withdrawn"],
+    "Under Contract":          ["pending", "under contract"],
+    "Unknown":                 [],
+  };
+  const keys = keywords[status] ?? [];
+  const match = history.find((h) =>
+    keys.some((k) => h.event.toLowerCase().includes(k))
+  );
+  return match?.date ?? history[0]?.date ?? null;
+}
+
 function mockRealtyApiListing(site: HdphSite): RealtyApiResult {
   // Deterministic by sid so results are stable across runs
   const hash = site.sid % 10;
@@ -266,7 +304,7 @@ function mockRealtyApiListing(site: HdphSite): RealtyApiResult {
   const slug = [site.address, site.city, site.state, site.zip]
     .filter(Boolean).join(" ").toLowerCase()
     .replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
-  return { status, price, listingUrl: `https://www.zillow.com/homes/${slug}_rb/` };
+  return { status, price, listingUrl: `https://www.zillow.com/homes/${slug}_rb/`, statusDate: null };
 }
 
 async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | null> {
@@ -298,8 +336,9 @@ async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | 
   const listingUrl = pd.hdpUrl
     ? `https://www.zillow.com${pd.hdpUrl}`
     : `https://www.zillow.com/homes/${encodeURIComponent(fullAddress.replace(/\s+/g, "-"))}_rb/`;
+  const statusDate = statusDateFromHistory(pd.priceHistory, status);
 
-  return { status, price, listingUrl };
+  return { status, price, listingUrl, statusDate };
 }
 
 // ── Change detection ──────────────────────────────────────────────────────────
@@ -444,7 +483,10 @@ async function main() {
   const newChanges: ListingChange[] = [];
   let checked = 0; let errors = 0; let notFound = 0;
 
-  for (const site of sites) {
+  const sitesToCheck = TEST_LIMIT > 0 ? sites.slice(0, TEST_LIMIT) : sites;
+  if (TEST_LIMIT > 0) console.log(`⚠️  TEST_LIMIT=${TEST_LIMIT} — checking first ${TEST_LIMIT} sites only`);
+
+  for (const site of sitesToCheck) {
     console.log(`\n🔎 SID ${site.sid} — ${site.address}…`);
 
     let result: RealtyApiResult | null = null;
@@ -499,7 +541,7 @@ async function main() {
           previousStatus: "For Sale", currentStatus: result.status,
           previousPrice: result.price, currentPrice: result.price,
           priceDelta: null,
-          shotDate: site.created, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
+          shotDate: site.created, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
         });
         console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
       } else {
@@ -522,7 +564,7 @@ async function main() {
         previousPrice: existing.lastPrice,   currentPrice: result.price,
         priceDelta: result.price !== null && existing.lastPrice !== null
           ? result.price - existing.lastPrice : null,
-        shotDate: existing.shotDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
+        shotDate: existing.shotDate, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
       });
       console.log(`   🔔 Change: ${CHANGE_LABELS[changeType]}`);
     } else {

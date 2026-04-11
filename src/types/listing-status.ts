@@ -54,6 +54,7 @@ export interface ListingChange {
   currentPrice: number | null;
   priceDelta: number | null;  // negative = price drop
   shotDate: string;           // when the photo shoot happened (site.created)
+  statusDate: string | null;  // "YYYY-MM-DD" when the status change actually occurred (from Zillow history)
   detectedAt: string;         // ISO timestamp
   listingUrl: string;
   hdphUrl: string;            // link to HDPhotoHub admin page for this shoot

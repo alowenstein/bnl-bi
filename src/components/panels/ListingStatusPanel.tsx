@@ -148,9 +148,14 @@ function ChangeCard({
   const [msgOpen, setMsgOpen] = useState(false);
   const message = composeMessage(change);
 
-  const date = new Date(change.detectedAt).toLocaleDateString("en-US", {
+  const shotDate = new Date(change.shotDate).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
   });
+  const statusDate = change.statusDate
+    ? new Date(change.statusDate + "T12:00:00").toLocaleDateString("en-US", {
+        month: "short", day: "numeric", year: "numeric",
+      })
+    : null;
   const mlsText = change.mls ? `MLS# ${change.mls}` : "No MLS#";
   const isPriceChange = change.changeType === "price_change";
 
@@ -184,12 +189,15 @@ function ChangeCard({
 
       {/* Main content */}
       <div className="flex-1 min-w-0 pr-6">
-        {/* Top row: date + badge */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs text-gray-400">{date}</span>
+        {/* Top row: badge + status date */}
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${BADGE_CLASSES[change.changeType]}`}>
             {CHANGE_LABELS[change.changeType]}
           </span>
+          {statusDate && (
+            <span className="text-xs text-gray-500">on {statusDate}</span>
+          )}
+          <span className="text-xs text-gray-300">· shot {shotDate}</span>
         </div>
 
         {/* Address */}

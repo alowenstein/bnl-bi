@@ -21,7 +21,8 @@
       "detectedAt": "2026-04-11T15:20:29.311Z",
       "listingUrl": "https://www.zillow.com/homedetails/6909-W-Melody-Dr-Laveen-AZ-85339/95092990_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2807122",
-      "photoUrl": null
+      "photoUrl": null,
+      "statusDate": "2026-03-31"
     },
     {
       "id": "2810329-2026-04-11T15:20:28.074Z",
@@ -44,7 +45,8 @@
       "detectedAt": "2026-04-11T15:20:28.074Z",
       "listingUrl": "https://www.zillow.com/homedetails/42406-W-Falling-Star-Dr-Maricopa-AZ-85138/67431791_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2810329",
-      "photoUrl": "https://media.hd.pics/2/6ee58ufg1e.jpg"
+      "photoUrl": "https://media.hd.pics/2/6ee58ufg1e.jpg",
+      "statusDate": "2026-04-02"
     },
     {
       "id": "2810329-2026-04-10T17:30:01.383Z",
@@ -65,7 +67,8 @@
       "detectedAt": "2026-04-10T17:30:01.383Z",
       "listingUrl": "https://www.zillow.com/homes/42406-w-falling-star-dr-maricopa-az-85138_rb/",
       "photoUrl": "https://media.hd.pics/2/6ee58ufg1e.jpg",
-      "shotDate": "2/12/2026 1:42:26 AM"
+      "shotDate": "2/12/2026 1:42:26 AM",
+      "statusDate": "2026-04-02"
     },
     {
       "id": "2810333-2026-04-11T15:20:27.213Z",
@@ -88,7 +91,8 @@
       "detectedAt": "2026-04-11T15:20:27.213Z",
       "listingUrl": "https://www.zillow.com/homedetails/6416-W-Range-Mule-Dr-Phoenix-AZ-85083/250185146_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2810333",
-      "photoUrl": "https://media.hd.pics/2/9a22hkt151.jpg"
+      "photoUrl": "https://media.hd.pics/2/9a22hkt151.jpg",
+      "statusDate": "2026-04-10"
     },
     {
       "id": "2810333-2026-04-11T01:58:42.822Z",
@@ -109,7 +113,8 @@
       "detectedAt": "2026-04-11T01:58:42.822Z",
       "listingUrl": "https://www.zillow.com/homedetails/6416-W-Range-Mule-Dr-Phoenix-AZ-85083/250185146_zpid/",
       "photoUrl": "https://media.hd.pics/2/9a22hkt151.jpg",
-      "shotDate": "2/12/2026 1:45:39 AM"
+      "shotDate": "2/12/2026 1:45:39 AM",
+      "statusDate": "2026-04-10"
     },
     {
       "id": "2812738-2026-04-11T15:20:26.429Z",
@@ -132,7 +137,8 @@
       "detectedAt": "2026-04-11T15:20:26.429Z",
       "listingUrl": "https://www.zillow.com/homedetails/9450-E-Becker-Ln-APT-2034-Scottsdale-AZ-85260/68537886_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2812738",
-      "photoUrl": "https://media.hd.pics/2/p5zt5abhwm.jpg"
+      "photoUrl": "https://media.hd.pics/2/p5zt5abhwm.jpg",
+      "statusDate": "2026-03-16"
     },
     {
       "id": "2812738-2026-04-10T17:30:01.383Z",
@@ -153,7 +159,8 @@
       "detectedAt": "2026-04-10T17:30:01.383Z",
       "listingUrl": "https://www.zillow.com/homes/9450-e-becker-ln-scottsdale-az-85260_rb/",
       "photoUrl": "https://media.hd.pics/2/p5zt5abhwm.jpg",
-      "shotDate": "2/13/2026 12:39:14 AM"
+      "shotDate": "2/13/2026 12:39:14 AM",
+      "statusDate": "2018-09-20"
     },
     {
       "id": "2814303-2026-04-11T15:20:25.389Z",
@@ -176,7 +183,8 @@
       "detectedAt": "2026-04-11T15:20:25.389Z",
       "listingUrl": "https://www.zillow.com/homedetails/4617-E-Cambridge-Ave-Phoenix-AZ-85008/338666844_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2814303",
-      "photoUrl": null
+      "photoUrl": null,
+      "statusDate": "2026-03-11"
     },
     {
       "id": "2815476-2026-04-11T15:20:24.566Z",
@@ -199,7 +207,8 @@
       "detectedAt": "2026-04-11T15:20:24.566Z",
       "listingUrl": "https://www.zillow.com/homedetails/3444-E-Windrose-Dr-Phoenix-AZ-85032/7814572_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2815476",
-      "photoUrl": "https://media.hd.pics/2/yn4wkonnrl.jpg"
+      "photoUrl": "https://media.hd.pics/2/yn4wkonnrl.jpg",
+      "statusDate": "2026-03-20"
     },
     {
       "id": "2815476-2026-04-10T17:30:01.383Z",
@@ -220,7 +229,8 @@
       "detectedAt": "2026-04-10T17:30:01.383Z",
       "listingUrl": "https://www.zillow.com/homes/3444-e-windrose-dr-phoenix-az-85032_rb/",
       "photoUrl": "https://media.hd.pics/2/yn4wkonnrl.jpg",
-      "shotDate": "2/14/2026 4:20:42 PM"
+      "shotDate": "2/14/2026 4:20:42 PM",
+      "statusDate": "2026-02-23"
     },
     {
       "id": "2829535-2026-04-11T15:20:22.773Z",
@@ -243,7 +253,8 @@
       "detectedAt": "2026-04-11T15:20:22.773Z",
       "listingUrl": "https://www.zillow.com/homedetails/6721-E-Ludlow-Dr-Scottsdale-AZ-85254/8025746_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2829535",
-      "photoUrl": "https://media.hd.pics/2/b1ypzo1310.jpg"
+      "photoUrl": "https://media.hd.pics/2/b1ypzo1310.jpg",
+      "statusDate": "2026-03-31"
     },
     {
       "id": "2833710-2026-04-11T15:20:21.132Z",
@@ -266,7 +277,8 @@
       "detectedAt": "2026-04-11T15:20:21.132Z",
       "listingUrl": "https://www.zillow.com/homedetails/1731-E-Waltann-Ln-Phoenix-AZ-85022/8004542_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2833710",
-      "photoUrl": "https://media.hd.pics/2/5ue0h0a0zj.jpg"
+      "photoUrl": "https://media.hd.pics/2/5ue0h0a0zj.jpg",
+      "statusDate": "2026-03-21"
     },
     {
       "id": "2835471-2026-04-11T15:20:19.207Z",
@@ -289,7 +301,8 @@
       "detectedAt": "2026-04-11T15:20:19.207Z",
       "listingUrl": "https://www.zillow.com/homedetails/2316-W-White-Spar-Rd-New-River-AZ-85087/7927729_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2835471",
-      "photoUrl": "https://media.hd.pics/2/sag8s578bv.jpg"
+      "photoUrl": "https://media.hd.pics/2/sag8s578bv.jpg",
+      "statusDate": "2026-03-09"
     },
     {
       "id": "2837176-2026-04-11T15:20:18.347Z",
@@ -312,7 +325,8 @@
       "detectedAt": "2026-04-11T15:20:18.347Z",
       "listingUrl": "https://www.zillow.com/homedetails/6026-E-Vermillion-Cir-Mesa-AZ-85215/7671760_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2837176",
-      "photoUrl": "https://media.hd.pics/2/c2zxys9oty.jpg"
+      "photoUrl": "https://media.hd.pics/2/c2zxys9oty.jpg",
+      "statusDate": "2026-03-30"
     },
     {
       "id": "2841448-2026-04-11T15:20:17.493Z",
@@ -335,7 +349,8 @@
       "detectedAt": "2026-04-11T15:20:17.493Z",
       "listingUrl": "https://www.zillow.com/homedetails/22021-N-Arrellaga-Dr-Sun-City-West-AZ-85375/64570693_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2841448",
-      "photoUrl": "https://media.hd.pics/2/2kz0qq06z2.jpg"
+      "photoUrl": "https://media.hd.pics/2/2kz0qq06z2.jpg",
+      "statusDate": "2026-03-17"
     },
     {
       "id": "2851678-2026-04-11T15:20:12.808Z",
@@ -358,7 +373,8 @@
       "detectedAt": "2026-04-11T15:20:12.808Z",
       "listingUrl": "https://www.zillow.com/homedetails/16018-W-Shangri-La-Rd-Surprise-AZ-85379/71609217_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2851678",
-      "photoUrl": "https://media.hd.pics/2/6ta8o3tzxj.jpg"
+      "photoUrl": "https://media.hd.pics/2/6ta8o3tzxj.jpg",
+      "statusDate": "2026-03-12"
     },
     {
       "id": "2852794-2026-04-11T15:20:10.190Z",
@@ -381,7 +397,8 @@
       "detectedAt": "2026-04-11T15:20:10.190Z",
       "listingUrl": "https://www.zillow.com/homedetails/5010-E-Dahlia-Dr-Scottsdale-AZ-85254/7823890_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2852794",
-      "photoUrl": "https://media.hd.pics/2/5ukm52h1b7.jpg"
+      "photoUrl": "https://media.hd.pics/2/5ukm52h1b7.jpg",
+      "statusDate": "2026-04-06"
     },
     {
       "id": "2858218-2026-04-11T15:20:08.389Z",
@@ -404,7 +421,8 @@
       "detectedAt": "2026-04-11T15:20:08.389Z",
       "listingUrl": "https://www.zillow.com/homedetails/28721-N-168th-Pl-Rio-Verde-AZ-85263/81992292_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2858218",
-      "photoUrl": "https://media.hd.pics/2/1dn3wtmuz9.jpg"
+      "photoUrl": "https://media.hd.pics/2/1dn3wtmuz9.jpg",
+      "statusDate": "2020-10-27"
     },
     {
       "id": "2858969-2026-04-11T15:20:07.440Z",
@@ -427,7 +445,8 @@
       "detectedAt": "2026-04-11T15:20:07.440Z",
       "listingUrl": "https://www.zillow.com/homedetails/2455-N-Kachina-Mesa-AZ-85203/7613102_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2858969",
-      "photoUrl": "https://media.hd.pics/2/zvundwl2yn.jpg"
+      "photoUrl": "https://media.hd.pics/2/zvundwl2yn.jpg",
+      "statusDate": "2026-04-02"
     },
     {
       "id": "2868081-2026-04-11T15:20:04.072Z",
@@ -450,7 +469,8 @@
       "detectedAt": "2026-04-11T15:20:04.072Z",
       "listingUrl": "https://www.zillow.com/homedetails/611-W-Gibraltar-Ln-Phoenix-AZ-85023/7965018_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2868081",
-      "photoUrl": "https://media.hd.pics/2/9rve679tcz.jpg"
+      "photoUrl": "https://media.hd.pics/2/9rve679tcz.jpg",
+      "statusDate": "2026-03-18"
     },
     {
       "id": "2876324-2026-04-11T15:20:03.170Z",
@@ -473,7 +493,8 @@
       "detectedAt": "2026-04-11T15:20:03.170Z",
       "listingUrl": "https://www.zillow.com/homedetails/11294-E-Quarry-Trl-Scottsdale-AZ-85262/8038405_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2876324",
-      "photoUrl": "https://media.hd.pics/2/f3exb4ly0c.jpg"
+      "photoUrl": "https://media.hd.pics/2/f3exb4ly0c.jpg",
+      "statusDate": "2026-04-01"
     },
     {
       "id": "2877279-2026-04-11T15:20:01.497Z",
@@ -496,7 +517,8 @@
       "detectedAt": "2026-04-11T15:20:01.497Z",
       "listingUrl": "https://www.zillow.com/homedetails/19058-N-23rd-Pl-Phoenix-AZ-85024/7994835_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2877279",
-      "photoUrl": "https://media.hd.pics/2/h9vven7x39.jpg"
+      "photoUrl": "https://media.hd.pics/2/h9vven7x39.jpg",
+      "statusDate": "2026-03-20"
     },
     {
       "id": "2879454-2026-04-11T15:19:59.877Z",
@@ -519,7 +541,8 @@
       "detectedAt": "2026-04-11T15:19:59.877Z",
       "listingUrl": "https://www.zillow.com/homedetails/10325-E-Shangri-La-Rd-Scottsdale-AZ-85260/8049510_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2879454",
-      "photoUrl": null
+      "photoUrl": null,
+      "statusDate": "2024-01-05"
     },
     {
       "id": "2885280-2026-04-11T15:19:56.424Z",
@@ -542,7 +565,8 @@
       "detectedAt": "2026-04-11T15:19:56.424Z",
       "listingUrl": "https://www.zillow.com/homedetails/12037-N-81st-St-Scottsdale-AZ-85260/7863546_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2885280",
-      "photoUrl": null
+      "photoUrl": null,
+      "statusDate": "1994-03-15"
     },
     {
       "id": "2895810-2026-04-11T15:19:49.805Z",
@@ -565,7 +589,8 @@
       "detectedAt": "2026-04-11T15:19:49.805Z",
       "listingUrl": "https://www.zillow.com/homedetails/1822-W-El-Caminito-Dr-Phoenix-AZ-85021/119917815_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2895810",
-      "photoUrl": "https://media.hd.pics/2/6hmq0njp1i.jpg"
+      "photoUrl": "https://media.hd.pics/2/6hmq0njp1i.jpg",
+      "statusDate": "2024-05-13"
     },
     {
       "id": "2898843-2026-04-11T01:58:00.846Z",
@@ -586,7 +611,8 @@
       "detectedAt": "2026-04-11T01:58:00.846Z",
       "listingUrl": "https://www.zillow.com/homedetails/886-E-Desert-Moon-Trl-San-Tan-Valley-AZ-85143/54586599_zpid/",
       "photoUrl": "https://media.hd.pics/2/edzyqpliu1.jpg",
-      "shotDate": "3/20/2026 4:59:40 AM"
+      "shotDate": "3/20/2026 4:59:40 AM",
+      "statusDate": "2026-04-11"
     },
     {
       "id": "2902231-2026-04-11T15:19:47.796Z",
@@ -609,7 +635,8 @@
       "detectedAt": "2026-04-11T15:19:47.796Z",
       "listingUrl": "https://www.zillow.com/homedetails/4010-E-Melinda-Ln-Phoenix-AZ-85050/50182109_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2902231",
-      "photoUrl": "https://media.hd.pics/2/jiadjcyskc.jpg"
+      "photoUrl": "https://media.hd.pics/2/jiadjcyskc.jpg",
+      "statusDate": "2026-03-31"
     },
     {
       "id": "2902520-2026-04-11T15:19:46.942Z",
@@ -653,7 +680,8 @@
       "detectedAt": "2026-04-11T01:57:57.905Z",
       "listingUrl": "https://www.zillow.com/homedetails/334-W-Medlock-Dr-Phoenix-AZ-85013/2061895275_zpid/",
       "photoUrl": "https://media.hd.pics/2/9ciq5ya450.jpg",
-      "shotDate": "3/22/2026 12:56:50 AM"
+      "shotDate": "3/22/2026 12:56:50 AM",
+      "statusDate": "2023-04-05"
     },
     {
       "id": "2934413-2026-04-11T15:19:42.086Z",
@@ -676,7 +704,8 @@
       "detectedAt": "2026-04-11T15:19:42.086Z",
       "listingUrl": "https://www.zillow.com/homedetails/6625-E-Culver-St-Scottsdale-AZ-85257/7571633_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2934413",
-      "photoUrl": "https://media.hd.pics/2/kj9qed9zra.jpg"
+      "photoUrl": "https://media.hd.pics/2/kj9qed9zra.jpg",
+      "statusDate": "2024-07-01"
     },
     {
       "id": "2950676-2026-04-11T15:19:39.520Z",
@@ -699,7 +728,8 @@
       "detectedAt": "2026-04-11T15:19:39.520Z",
       "listingUrl": "https://www.zillow.com/homedetails/39306-N-2nd-Pl-Phoenix-AZ-85086/64723927_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2950676",
-      "photoUrl": "https://media.hd.pics/2/7xrbagrg8p.jpg"
+      "photoUrl": "https://media.hd.pics/2/7xrbagrg8p.jpg",
+      "statusDate": "2010-04-15"
     },
     {
       "id": "2953773-2026-04-11T15:19:37.935Z",
@@ -722,7 +752,8 @@
       "detectedAt": "2026-04-11T15:19:37.935Z",
       "listingUrl": "https://www.zillow.com/homedetails/5809-W-Plum-Rd-Phoenix-AZ-85083/95185281_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2953773",
-      "photoUrl": null
+      "photoUrl": null,
+      "statusDate": "2015-03-26"
     },
     {
       "id": "2961864-2026-04-11T15:19:37.115Z",
@@ -745,7 +776,8 @@
       "detectedAt": "2026-04-11T15:19:37.115Z",
       "listingUrl": "https://www.zillow.com/homedetails/14032-N-111th-Ave-Sun-City-AZ-85351/7920528_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2961864",
-      "photoUrl": "https://media.hd.pics/2/2i7mfdx3mn.jpg"
+      "photoUrl": "https://media.hd.pics/2/2i7mfdx3mn.jpg",
+      "statusDate": "2011-07-11"
     },
     {
       "id": "2964361-2026-04-11T15:19:36.370Z",
@@ -768,7 +800,8 @@
       "detectedAt": "2026-04-11T15:19:36.370Z",
       "listingUrl": "https://www.zillow.com/homedetails/14131-W-Country-Gables-Dr-Surprise-AZ-85379/67801939_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2964361",
-      "photoUrl": "https://media.hd.pics/2/4j76vsf9l8.jpg"
+      "photoUrl": "https://media.hd.pics/2/4j76vsf9l8.jpg",
+      "statusDate": "2019-12-17"
     },
     {
       "id": "2967891-2026-04-11T15:19:35.531Z",
@@ -791,7 +824,8 @@
       "detectedAt": "2026-04-11T15:19:35.531Z",
       "listingUrl": "https://www.zillow.com/homedetails/11909-N-80th-Pl-Scottsdale-AZ-85260/7863503_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2967891",
-      "photoUrl": null
+      "photoUrl": null,
+      "statusDate": "2026-04-07"
     },
     {
       "id": "2968413-2026-04-11T15:19:34.783Z",
@@ -814,7 +848,8 @@
       "detectedAt": "2026-04-11T15:19:34.783Z",
       "listingUrl": "https://www.zillow.com/homedetails/11909-N-80th-Pl-Scottsdale-AZ-85260/7863503_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2968413",
-      "photoUrl": null
+      "photoUrl": null,
+      "statusDate": "2026-04-07"
     },
     {
       "id": "2968417-2026-04-11T15:19:34.043Z",
@@ -837,7 +872,8 @@
       "detectedAt": "2026-04-11T15:19:34.043Z",
       "listingUrl": "https://www.zillow.com/homedetails/9922-N-57th-Ln-Glendale-AZ-85302/7735562_zpid/",
       "hdphUrl": "https://order.buildsnlenses.com/admin/site.aspx?nSiteID=2968417",
-      "photoUrl": null
+      "photoUrl": null,
+      "statusDate": "2003-10-31"
     }
   ]
 }
