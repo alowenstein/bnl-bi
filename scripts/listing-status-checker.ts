@@ -513,7 +513,7 @@ async function main() {
     const agentPhone = site.user.phone?.trim() || null;
     const photoUrl   = getFirstPhotoUrl(site);
     const address2   = site.address2?.trim() || null;
-    const hdphUrl    = `${HDPH_BASE.replace("/api/v1", "")}/admin/site.aspx?nSiteID=${site.sid}`;
+    const hdphUrl    = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
 
     if (!existing) {
       snapshotStore.snapshots[site.sid] = {
