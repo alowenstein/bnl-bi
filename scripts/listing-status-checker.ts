@@ -532,8 +532,13 @@ async function main() {
       // Backfill: on first sight, if the listing is already in a noteworthy
       // status (not just "For Sale"), surface it as a historical change so the
       // dashboard shows the full 60-day picture on the very first run.
+      // Skip if the status event predates our shoot — it's a pre-existing
+      // condition unrelated to our work.
       const backfillType = statusToBackfillChange(result.status);
-      if (backfillType) {
+      const statusIsStale =
+        result.statusDate !== null &&
+        new Date(result.statusDate) < new Date(site.created);
+      if (backfillType && !statusIsStale) {
         newChanges.push({
           id: `${site.sid}-${now}`,
           sid: site.sid, address: site.address, address2,
@@ -547,6 +552,8 @@ async function main() {
           shotDate: site.created, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
         });
         console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
+      } else if (backfillType && statusIsStale) {
+        console.log(`   ⏭️  Skipped: status predates shoot (${result.statusDate} < ${site.created.slice(0,10)})`);
       } else {
         console.log(`   ✨ New snapshot created`);
       }
