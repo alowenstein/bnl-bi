@@ -541,7 +541,12 @@ async function main() {
     log.changes = [...newChanges, ...log.changes].slice(0, MAX_LOG_ENTRIES);
     await saveChangeLog(log);
     console.log(`💾 Change log updated (${newChanges.length} new entries)`);
-    await sendDigestEmail(newChanges);
+    if (GMAIL_USER && GMAIL_PASS && GMAIL_USER !== "your_gmail@gmail.com") {
+      try { await sendDigestEmail(newChanges); }
+      catch (err) { console.warn("⚠️  Email digest failed (check GMAIL_USER / GMAIL_APP_PASSWORD):", (err as Error).message); }
+    } else {
+      console.log("ℹ️  Email digest skipped — GMAIL credentials not configured");
+    }
   }
 
   console.log(`\n✅ Done. Checked: ${checked}, Not found: ${notFound}, Errors: ${errors}, Changes: ${newChanges.length}`);
