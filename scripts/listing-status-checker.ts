@@ -75,6 +75,10 @@ const REALTYAPI_BASE   = "https://zillow.realtyapi.io";
 const WINDOW_DAYS      = 60;
 const MAX_LOG_ENTRIES  = 200;
 
+const KV_URL   = process.env.KV_REST_API_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+const USE_KV   = !!(KV_URL && KV_TOKEN);
+
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
@@ -102,24 +106,48 @@ function getFirstPhotoUrl(site: HdphSite): string | null {
   return photo?.url ?? null;
 }
 
-// ── File I/O ──────────────────────────────────────────────────────────────────
+// ── Storage (KV in prod, JSON file locally) ───────────────────────────────────
 
-function loadSnapshots(): SnapshotStore {
+const KV_SNAPSHOTS_KEY  = "listing:snapshots";
+const KV_CHANGE_LOG_KEY = "listing:change-log";
+
+async function kvGet<T>(key: string): Promise<T | null> {
+  const res = await fetch(`${KV_URL}/get/${key}`, {
+    headers: { Authorization: `Bearer ${KV_TOKEN}` },
+  });
+  if (!res.ok) return null;
+  const { result } = await res.json() as { result: string | null };
+  return result ? JSON.parse(result) as T : null;
+}
+
+async function kvSet(key: string, value: unknown): Promise<void> {
+  await fetch(`${KV_URL}/set/${key}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${KV_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ value: JSON.stringify(value) }),
+  });
+}
+
+async function loadSnapshots(): Promise<SnapshotStore> {
+  if (USE_KV) return (await kvGet<SnapshotStore>(KV_SNAPSHOTS_KEY)) ?? { lastRun: null, snapshots: {} };
   try { return JSON.parse(fs.readFileSync(SNAPSHOTS_FILE, "utf-8")) as SnapshotStore; }
   catch { return { lastRun: null, snapshots: {} }; }
 }
 
-function saveSnapshots(store: SnapshotStore): void {
+async function saveSnapshots(store: SnapshotStore): Promise<void> {
+  if (USE_KV) { await kvSet(KV_SNAPSHOTS_KEY, store); return; }
   fs.mkdirSync(path.dirname(SNAPSHOTS_FILE), { recursive: true });
   fs.writeFileSync(SNAPSHOTS_FILE, JSON.stringify(store, null, 2));
 }
 
-function loadChangeLog(): ChangeLogStore {
+async function loadChangeLog(): Promise<ChangeLogStore> {
+  if (USE_KV) return (await kvGet<ChangeLogStore>(KV_CHANGE_LOG_KEY)) ?? { changes: [] };
   try { return JSON.parse(fs.readFileSync(CHANGE_LOG_FILE, "utf-8")) as ChangeLogStore; }
   catch { return { changes: [] }; }
 }
 
-function saveChangeLog(store: ChangeLogStore): void {
+async function saveChangeLog(store: ChangeLogStore): Promise<void> {
+  if (USE_KV) { await kvSet(KV_CHANGE_LOG_KEY, store); return; }
   fs.mkdirSync(path.dirname(CHANGE_LOG_FILE), { recursive: true });
   fs.writeFileSync(CHANGE_LOG_FILE, JSON.stringify(store, null, 2));
 }
@@ -396,7 +424,7 @@ async function main() {
     return;
   }
 
-  const snapshotStore = loadSnapshots();
+  const snapshotStore = await loadSnapshots();
   const newChanges: ListingChange[] = [];
   let checked = 0; let errors = 0; let notFound = 0;
 
@@ -471,13 +499,13 @@ async function main() {
   }
 
   snapshotStore.lastRun = new Date().toISOString();
-  saveSnapshots(snapshotStore);
+  await saveSnapshots(snapshotStore);
   console.log(`\n💾 Snapshots saved (${Object.keys(snapshotStore.snapshots).length} total)`);
 
   if (newChanges.length > 0) {
-    const log = loadChangeLog();
+    const log = await loadChangeLog();
     log.changes = [...newChanges, ...log.changes].slice(0, MAX_LOG_ENTRIES);
-    saveChangeLog(log);
+    await saveChangeLog(log);
     console.log(`💾 Change log updated (${newChanges.length} new entries)`);
     await sendDigestEmail(newChanges);
   }

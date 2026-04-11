@@ -45,3 +45,4 @@ data/listing-snapshots.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*.local

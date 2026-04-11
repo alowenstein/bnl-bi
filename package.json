@@ -16,6 +16,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@types/nodemailer": "^7.0.11",
+    "@vercel/kv": "^3.0.0",
     "composio-core": "^0.5.39",
     "next": "16.2.0",
     "nodemailer": "^8.0.3",
