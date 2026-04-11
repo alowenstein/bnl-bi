@@ -30,12 +30,13 @@ interface ListingSnapshot {
   sid: number;
   address: string; city: string; state: string; zip: string;
   mls: string | null;
-  agentName: string; agentEmail: string;
+  agentName: string; agentEmail: string; agentPhone: string | null;
   shotDate: string;
   lastChecked: string;
   lastStatus: ListingStatus;
   lastPrice: number | null;
   listingUrl: string;
+  photoUrl: string | null;
 }
 
 interface ListingChange {
@@ -43,13 +44,14 @@ interface ListingChange {
   sid: number;
   address: string; city: string; state: string;
   mls: string | null;
-  agentName: string; agentEmail: string;
+  agentName: string; agentEmail: string; agentPhone: string | null;
   changeType: ChangeType;
   previousStatus: ListingStatus; currentStatus: ListingStatus;
   previousPrice: number | null;  currentPrice: number | null;
   priceDelta: number | null;
   detectedAt: string;
   listingUrl: string;
+  photoUrl: string | null;
 }
 
 interface SnapshotStore {
