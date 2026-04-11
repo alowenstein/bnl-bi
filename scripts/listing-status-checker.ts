@@ -227,6 +227,7 @@ interface RealtyApiPropertyDetails {
   contingentListingType?: string | null;
   listingSubType?: RealtyApiListingSubType;
   priceHistory?: RealtyApiPriceHistoryEntry[] | null;
+  hiResImageLink?: string | null;
 }
 
 interface RealtyApiResponse {
@@ -239,6 +240,7 @@ interface RealtyApiResult {
   price: number | null;
   listingUrl: string;
   statusDate: string | null;  // "YYYY-MM-DD" — when the status change actually happened
+  zillowPhotoUrl: string | null; // fallback photo when HDPH has no stills
 }
 
 function mapRealtyApiStatus(
@@ -304,7 +306,7 @@ function mockRealtyApiListing(site: HdphSite): RealtyApiResult {
   const slug = [site.address, site.city, site.state, site.zip]
     .filter(Boolean).join(" ").toLowerCase()
     .replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
-  return { status, price, listingUrl: `https://www.zillow.com/homes/${slug}_rb/`, statusDate: null };
+  return { status, price, listingUrl: `https://www.zillow.com/homes/${slug}_rb/`, statusDate: null, zillowPhotoUrl: null };
 }
 
 async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | null> {
@@ -337,8 +339,9 @@ async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | 
     ? `https://www.zillow.com${pd.hdpUrl}`
     : `https://www.zillow.com/homes/${encodeURIComponent(fullAddress.replace(/\s+/g, "-"))}_rb/`;
   const statusDate = statusDateFromHistory(pd.priceHistory, status);
+  const zillowPhotoUrl = pd.hiResImageLink ?? null;
 
-  return { status, price, listingUrl, statusDate };
+  return { status, price, listingUrl, statusDate, zillowPhotoUrl };
 }
 
 // ── Change detection ──────────────────────────────────────────────────────────
@@ -511,7 +514,7 @@ async function main() {
     const existing = snapshotStore.snapshots[site.sid];
 
     const agentPhone = site.user.phone?.trim() || null;
-    const photoUrl   = getFirstPhotoUrl(site);
+    const photoUrl   = getFirstPhotoUrl(site) ?? result.zillowPhotoUrl;
     const address2   = site.address2?.trim() || null;
     const hdphUrl    = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
 
