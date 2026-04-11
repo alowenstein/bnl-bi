@@ -303,6 +303,14 @@ function ChangeCard({
           >
             HD Photo Hub ↗
           </a>
+          <a
+            href={change.listingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            Zillow ↗
+          </a>
           <button
             onClick={() => setOpen((o) => !o)}
             className="text-xs text-blue-500 hover:text-blue-700 underline"
