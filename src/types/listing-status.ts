@@ -24,16 +24,17 @@ export interface ListingSnapshot {
   mls: string | null;
   agentName: string;
   agentEmail: string;
-  shotDate: string;          // from site.created
-  lastChecked: string;       // ISO timestamp
+  agentPhone: string | null;
+  shotDate: string;           // from site.created
+  lastChecked: string;        // ISO timestamp
   lastStatus: ListingStatus;
   lastPrice: number | null;
-  zillowUrl: string;
-  consecutiveErrors: number; // skip after MAX_ERRORS
+  listingUrl: string;
+  photoUrl: string | null;    // first still photo from HDPH media[]
 }
 
 export interface ListingChange {
-  id: string;                // `${sid}-${detectedAt}`
+  id: string;             // `${sid}-${detectedAt}`
   sid: number;
   address: string;
   city: string;
@@ -41,14 +42,16 @@ export interface ListingChange {
   mls: string | null;
   agentName: string;
   agentEmail: string;
+  agentPhone: string | null;
   changeType: ChangeType;
   previousStatus: ListingStatus;
   currentStatus: ListingStatus;
   previousPrice: number | null;
   currentPrice: number | null;
-  priceDelta: number | null; // negative = price drop
-  detectedAt: string;        // ISO timestamp
-  zillowUrl: string;
+  priceDelta: number | null;  // negative = price drop
+  detectedAt: string;         // ISO timestamp
+  listingUrl: string;
+  photoUrl: string | null;    // first still photo from HDPH media[]
 }
 
 export interface SnapshotStore {

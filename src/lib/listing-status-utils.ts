@@ -2,46 +2,19 @@ import type {
   ListingStatus,
   ChangeType,
   ListingSnapshot,
-} from "@/types/listing-status";
+} from "../types/listing-status";
 
-export function buildZillowUrl(site: {
-  address: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-}): string {
-  const slug = [site.address, site.city, site.state, site.zip]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
-  return `https://www.zillow.com/homes/${slug}_rb/`;
-}
-
-export function parseZillowStatus(md: string): ListingStatus {
-  const t = md.toLowerCase();
-  if (t.includes("accepting backup"))                                              return "Accepting Backup Offers";
-  if (t.includes("under contract"))                                                return "Under Contract";
-  if (t.includes("pending"))                                                       return "Pending";
-  if (t.includes("sold on") || t.includes("this home sold") || t.includes("sale price")) return "Sold";
-  if (t.includes("off market") || t.includes("no longer for sale"))               return "Off Market";
-  if (t.includes("for sale") || t.includes("zestimate") || t.includes("price cut")) return "For Sale";
-  return "Unknown";
-}
-
-export function parseZillowPrice(md: string): number | null {
-  const m =
-    md.match(/\$(\d{1,3}(?:,\d{3})+)/) ??
-    md.match(/\$(\d+)k\b/i) ??
-    md.match(/\$(\d+(?:\.\d+)?)m\b/i);
-  if (!m) return null;
-  const n   = m[0].toLowerCase();
-  const raw = m[1].replace(/,/g, "");
-  if (n.endsWith("m")) return Math.round(parseFloat(raw) * 1_000_000);
-  if (n.endsWith("k")) return Math.round(parseFloat(raw) * 1_000);
-  return parseInt(raw, 10);
+export function mapSparkStatus(standardStatus: string): ListingStatus {
+  switch (standardStatus) {
+    case "Active":              return "For Sale";
+    case "ActiveUnderContract": return "Accepting Backup Offers";
+    case "Pending":             return "Pending";
+    case "Closed":              return "Sold";
+    case "Withdrawn":
+    case "Expired":
+    case "Canceled":            return "Off Market";
+    default:                    return "Unknown";
+  }
 }
 
 export function detectChange(
