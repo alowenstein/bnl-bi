@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useListingChanges } from "@/hooks/useListingChanges";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
@@ -25,6 +25,38 @@ const BADGE_CLASSES: Record<ChangeType, string> = {
   back_on_market: "bg-purple-100 text-purple-700",
   off_market:     "bg-gray-100   text-gray-600",
 };
+
+// ── Dismissed IDs (localStorage) ──────────────────────────────────────────────
+
+const LS_KEY = "listing-dismissed";
+
+function useDismissed() {
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  // Load from localStorage on mount (client-only)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) setDismissed(new Set(JSON.parse(raw) as string[]));
+    } catch { /* ignore */ }
+  }, []);
+
+  const dismiss = useCallback((id: string) => {
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try { localStorage.setItem(LS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  const restoreAll = useCallback(() => {
+    setDismissed(new Set());
+    try { localStorage.removeItem(LS_KEY); } catch { /* ignore */ }
+  }, []);
+
+  return { dismissed, dismiss, restoreAll };
+}
 
 // ── Message composer ──────────────────────────────────────────────────────────
 
@@ -62,13 +94,7 @@ function composeMessage(c: ListingChange): string {
 
 type SendState = "idle" | "sending" | "sent" | "error";
 
-function SendButton({
-  change,
-  message,
-}: {
-  change: ListingChange;
-  message: string;
-}) {
+function SendButton({ change, message }: { change: ListingChange; message: string }) {
   const [state, setState] = useState<SendState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -82,10 +108,7 @@ function SendButton({
       const res = await fetch("/api/openphone/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to:      phone,
-          content: message,
-        }),
+        body: JSON.stringify({ to: phone, content: message }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));
@@ -98,17 +121,9 @@ function SendButton({
     }
   }
 
-  if (!hasPhone) {
-    return <span className="text-xs text-gray-400 italic">No phone on file</span>;
-  }
-
-  if (state === "sent") {
-    return <span className="text-xs font-medium text-green-600">✓ Sent</span>;
-  }
-
-  if (state === "error") {
-    return <span className="text-xs text-red-500" title={errorMsg}>✗ Failed</span>;
-  }
+  if (!hasPhone) return <span className="text-xs text-gray-400 italic">No phone on file</span>;
+  if (state === "sent")  return <span className="text-xs font-medium text-green-600">✓ Sent</span>;
+  if (state === "error") return <span className="text-xs text-red-500" title={errorMsg}>✗ Failed</span>;
 
   return (
     <button
@@ -123,7 +138,13 @@ function SendButton({
 
 // ── Change card ───────────────────────────────────────────────────────────────
 
-function ChangeCard({ change }: { change: ListingChange }) {
+function ChangeCard({
+  change,
+  onDismiss,
+}: {
+  change: ListingChange;
+  onDismiss: (id: string) => void;
+}) {
   const [msgOpen, setMsgOpen] = useState(false);
   const message = composeMessage(change);
 
@@ -134,7 +155,17 @@ function ChangeCard({ change }: { change: ListingChange }) {
   const isPriceChange = change.changeType === "price_change";
 
   return (
-    <div className="flex gap-4 rounded-xl bg-white dark:bg-gray-800 p-4 shadow-sm">
+    <div className="relative flex gap-4 rounded-xl bg-white dark:bg-gray-800 p-4 shadow-sm">
+      {/* Dismiss button */}
+      <button
+        onClick={() => onDismiss(change.id)}
+        title="Dismiss"
+        className="absolute top-3 right-3 flex h-6 w-6 items-center justify-center rounded-full text-gray-300 hover:bg-gray-100 hover:text-gray-500 dark:hover:bg-gray-700 transition-colors text-base leading-none"
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
+
       {/* Listing photo */}
       <div className="flex-none w-24 h-24 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
         {change.photoUrl ? (
@@ -152,7 +183,7 @@ function ChangeCard({ change }: { change: ListingChange }) {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 pr-6">
         {/* Top row: date + badge */}
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs text-gray-400">{date}</span>
@@ -212,9 +243,13 @@ function ChangeCard({ change }: { change: ListingChange }) {
 
 export function ListingStatusPanel() {
   const { changes, isLoading, error } = useListingChanges();
+  const { dismissed, dismiss, restoreAll } = useDismissed();
 
   if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
   if (error)     return <ErrorBanner message={error.message} />;
+
+  const visible   = changes.filter((c) => !dismissed.has(c.id));
+  const nDismissed = dismissed.size;
 
   return (
     <section className="space-y-4">
@@ -222,14 +257,22 @@ export function ListingStatusPanel() {
         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
           Listing Status Changes
         </h2>
-        {changes.length > 0 && (
+        {visible.length > 0 && (
           <span className="rounded-full bg-emerald-100 dark:bg-emerald-950 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-            {changes.length}
+            {visible.length}
           </span>
+        )}
+        {nDismissed > 0 && (
+          <button
+            onClick={restoreAll}
+            className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            Show {nDismissed} dismissed
+          </button>
         )}
       </div>
 
-      {changes.length === 0 ? (
+      {visible.length === 0 && nDismissed === 0 ? (
         <div className="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm">
           <p className="text-sm text-gray-400 italic">
             No listing changes detected yet. Run{" "}
@@ -239,10 +282,19 @@ export function ListingStatusPanel() {
             to populate.
           </p>
         </div>
+      ) : visible.length === 0 ? (
+        <div className="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm">
+          <p className="text-sm text-gray-400 italic">
+            All listings dismissed.{" "}
+            <button onClick={restoreAll} className="text-blue-500 underline">
+              Restore all
+            </button>
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {changes.map((c) => (
-            <ChangeCard key={c.id} change={c} />
+          {visible.map((c) => (
+            <ChangeCard key={c.id} change={c} onDismiss={dismiss} />
           ))}
         </div>
       )}

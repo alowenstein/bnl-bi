@@ -328,6 +328,19 @@ function detectChange(
   return null;
 }
 
+// Maps a current listing status to a backfill ChangeType when we see a site
+// for the first time. Returns null for "For Sale" / "Unknown" (nothing to show).
+function statusToBackfillChange(status: ListingStatus): ChangeType | null {
+  switch (status) {
+    case "Pending":
+    case "Under Contract":          return "pending";
+    case "Accepting Backup Offers": return "backup_offers";
+    case "Sold":                    return "sold";
+    case "Off Market":              return "off_market";
+    default:                        return null;  // For Sale / Unknown
+  }
+}
+
 // ── Email ─────────────────────────────────────────────────────────────────────
 
 const CHANGE_LABELS: Record<ChangeType, string> = {
@@ -465,7 +478,28 @@ async function main() {
         lastStatus: result.status, lastPrice: result.price,
         listingUrl: result.listingUrl, photoUrl,
       };
-      console.log(`   ✨ New snapshot created`);
+
+      // Backfill: on first sight, if the listing is already in a noteworthy
+      // status (not just "For Sale"), surface it as a historical change so the
+      // dashboard shows the full 60-day picture on the very first run.
+      const backfillType = statusToBackfillChange(result.status);
+      if (backfillType) {
+        newChanges.push({
+          id: `${site.sid}-${now}`,
+          sid: site.sid, address: site.address,
+          city: site.city ?? "", state: site.state ?? "",
+          mls: site.mls ?? null,
+          agentName: site.user.name, agentEmail: site.user.email, agentPhone,
+          changeType: backfillType,
+          previousStatus: "For Sale", currentStatus: result.status,
+          previousPrice: result.price, currentPrice: result.price,
+          priceDelta: null,
+          detectedAt: now, listingUrl: result.listingUrl, photoUrl,
+        });
+        console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
+      } else {
+        console.log(`   ✨ New snapshot created`);
+      }
       continue;
     }
 
