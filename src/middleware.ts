@@ -30,6 +30,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Protect everything — pages and API routes
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Protect everything except static assets and the HDPH webhook
+  // (HDPH can't send Basic Auth — the webhook uses a secret query param instead)
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/hdph/webhook).*)"],
 };
