@@ -1,0 +1,167 @@
+{
+  "name": "HDPH New Order → SMS via OpenPhone",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.HDPH_BASE_URL }}/sites",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "fetch-hdph-sites",
+      "name": "Fetch HDPH Sites",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hdph-api-key",
+          "name": "HDPH API Key"
+        }
+      },
+      "notes": "Uses credential 'HDPH API Key' — set header name to 'api_key' and value to your HD Photo Hub API key."
+    },
+    {
+      "parameters": {
+        "jsCode": "// ─── Configuration ─────────────────────────────────────────────────────────\n// Look back slightly more than the polling interval to avoid gaps at boundaries.\nconst POLL_WINDOW_MINUTES = 10;\n\n// ─── Parse response ─────────────────────────────────────────────────────────\n// The HTTP node returns one item; its json property is the HDPH sites array.\nconst inputItem = $input.first();\nconst sites = Array.isArray(inputItem.json)\n  ? inputItem.json\n  : Object.values(inputItem.json); // fallback if wrapped in an object\n\n// ─── Filter for new, purchased orders ───────────────────────────────────────\nconst now = new Date();\nconst cutoff = new Date(now.getTime() - POLL_WINDOW_MINUTES * 60 * 1000);\n\nconst newOrders = sites.filter(site => {\n  if (site.purchased !== 'yes') return false;  // ignore unpaid / delivery-only\n  if (!site.created) return false;\n\n  // HDPH date format: \"M/D/YYYY H:MM:SS AM/PM\"  (e.g. \"4/12/2026 2:30:15 PM\")\n  const d = new Date(site.created);\n  return !isNaN(d.getTime()) && d >= cutoff;\n});\n\n// Return each new order as its own N8N item\nreturn newOrders.map(site => ({ json: site }));"
+      },
+      "id": "filter-new-orders",
+      "name": "Filter New Orders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-items",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-new-orders",
+      "name": "Any New Orders?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.APP_BASE_URL }}/api/n8n/order-sms",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ site: $json }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth"
+      },
+      "id": "send-order-sms",
+      "name": "Send Order SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 180],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "app-basic-auth",
+          "name": "App Basic Auth"
+        }
+      },
+      "notes": "Uses credential 'App Basic Auth' — set username/password to match BASIC_AUTH_USER / BASIC_AUTH_PASS env vars on the Next.js app."
+    },
+    {
+      "parameters": {},
+      "id": "no-new-orders",
+      "name": "No New Orders",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, 420]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [{ "node": "Fetch HDPH Sites", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch HDPH Sites": {
+      "main": [
+        [{ "node": "Filter New Orders", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter New Orders": {
+      "main": [
+        [{ "node": "Any New Orders?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Any New Orders?": {
+      "main": [
+        [{ "node": "Send Order SMS", "type": "main", "index": 0 }],
+        [{ "node": "No New Orders", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["hdph", "openphone", "sms"],
+  "triggerCount": 0,
+  "updatedAt": "2026-04-12T00:00:00.000Z",
+  "versionId": "1"
+}
