@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-const OPENPHONE_API_KEY  = process.env.OPENPHONE_API_KEY  ?? "";
-const OPENPHONE_FROM_NUM = process.env.OPENPHONE_FROM_NUM ?? "";
+const OPENPHONE_API_KEY  = (process.env.OPENPHONE_API_KEY  ?? "").trim();
+const OPENPHONE_FROM_NUM = (process.env.OPENPHONE_FROM_NUM ?? "").trim();
 
 export async function POST(req: Request) {
   if (!OPENPHONE_API_KEY || !OPENPHONE_FROM_NUM) {
