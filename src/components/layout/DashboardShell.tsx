@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useSites } from "@/hooks/useSites";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -23,12 +22,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <p className="text-xs text-gray-400">Real estate photography analytics</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href="/scholar"
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              Scholar Search
-            </Link>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
