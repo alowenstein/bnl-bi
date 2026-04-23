@@ -43,6 +43,7 @@ export interface HdphSite {
   purchased: "yes" | "no" | "delivery only";
   user: HdphUser;
   couser?: HdphUser;
+  member?: HdphUser;  // assigned photographer
   address: string;
   address2?: string;
   city: string;
