@@ -2,25 +2,28 @@
 
 import { useState } from "react";
 
-type Tab = "analytics" | "tracker";
+type Tab = "analytics" | "tracker" | "status";
 
 interface Props {
   analytics: React.ReactNode;
   tracker:   React.ReactNode;
+  status:    React.ReactNode;
 }
 
-export function DashboardTabs({ analytics, tracker }: Props) {
+export function DashboardTabs({ analytics, tracker, status }: Props) {
   const [active, setActive] = useState<Tab>("analytics");
 
   return (
     <div>
-      {/* Tab bar */}
       <div className="mb-8 flex gap-1 border-b border-gray-200">
         <TabButton label="Analytics"       id="analytics" active={active} onClick={setActive} />
         <TabButton label="Listing Tracker" id="tracker"   active={active} onClick={setActive} />
+        <TabButton label="On My Way"       id="status"    active={active} onClick={setActive} />
       </div>
 
-      {active === "analytics" ? analytics : tracker}
+      {active === "analytics" && analytics}
+      {active === "tracker"   && tracker}
+      {active === "status"    && status}
     </div>
   );
 }

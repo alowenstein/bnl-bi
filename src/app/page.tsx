@@ -7,6 +7,7 @@ import { InsightsPanel } from "@/components/panels/InsightsPanel";
 import { PackagesPanel } from "@/components/panels/PackagesPanel";
 import { AgentOnCameraPanel } from "@/components/panels/AgentOnCameraPanel";
 import { ListingStatusPanel } from "@/components/panels/ListingStatusPanel";
+import { StatusPanel } from "@/components/panels/StatusPanel";
 
 const analytics = (
   <>
@@ -30,11 +31,12 @@ const analytics = (
 );
 
 const tracker = <ListingStatusPanel />;
+const status  = <StatusPanel />;
 
 export default function DashboardPage() {
   return (
     <DashboardShell>
-      <DashboardTabs analytics={analytics} tracker={tracker} />
+      <DashboardTabs analytics={analytics} tracker={tracker} status={status} />
     </DashboardShell>
   );
 }
