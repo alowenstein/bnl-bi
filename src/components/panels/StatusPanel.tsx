@@ -14,10 +14,19 @@ function formatAddress(site: HdphSite) {
   return [site.address, site.city, site.state].filter(Boolean).join(", ");
 }
 
-function formatTime(dateStr: string) {
+function formatTime(dateStr: string | null | undefined) {
+  if (!dateStr) return null;
   return new Date(dateStr).toLocaleTimeString("en-US", {
     hour: "numeric", minute: "2-digit", timeZone: "America/Phoenix",
   });
+}
+
+function apptDate(site: HdphSite) {
+  const dates = (site.tasks ?? [])
+    .filter((t) => !t.canceled && t.apptdate)
+    .map((t) => t.apptdate as string)
+    .sort();
+  return dates[0] ?? null;
 }
 
 function JobCard({ site }: { site: HdphSite }) {
@@ -59,7 +68,9 @@ function JobCard({ site }: { site: HdphSite }) {
     <div className="rounded-xl bg-white p-4 shadow-sm space-y-3">
       <div>
         <p className="font-semibold text-gray-900">{address}</p>
-        <p className="text-sm text-gray-500">{formatTime(site.created)}</p>
+        {formatTime(apptDate(site)) && (
+          <p className="text-sm text-gray-500">{formatTime(apptDate(site))}</p>
+        )}
       </div>
 
       <div className="text-sm space-y-0.5">

@@ -36,6 +36,15 @@ export interface HdphUser {
   keyring: string;
 }
 
+export interface HdphTask {
+  tid: number;
+  name: string;
+  type: string;
+  apptdate: string | null;
+  canceled: boolean;
+  memberassigned?: string;
+}
+
 export interface HdphSite {
   sid: number;
   bid: number;
@@ -59,8 +68,9 @@ export interface HdphSite {
   price?: number; // MLS listing price — not our invoice
   banner?: string;
   description?: string;
-  created: string; // "M/D/YYYY H:MM:SS AM/PM"
+  created: string; // "M/D/YYYY H:MM:SS AM/PM" — order booking date
   activated?: string;
+  tasks?: HdphTask[];
   media: HdphMedia[];
   unpaid?: number;
   unpaidall?: number;
