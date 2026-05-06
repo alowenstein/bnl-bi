@@ -1,8 +1,13 @@
 import useSWR from "swr";
+import { useState, useCallback } from "react";
 import type { ListingChange } from "@/types/listing-status";
 
 interface ListingChangesResponse {
   changes: ListingChange[];
+  cached: boolean;
+  fetchedAt: string;
+  count: number;
+  sitesChecked?: number;
 }
 
 const fetcher = (url: string) =>
@@ -11,13 +16,36 @@ const fetcher = (url: string) =>
     return r.json() as Promise<ListingChangesResponse>;
   });
 
-const REFRESH = Number(process.env.NEXT_PUBLIC_REFRESH_INTERVAL ?? 300_000);
-
 export function useListingChanges() {
+  // bust increments on manual refresh — changes the SWR key to force a fresh
+  // server fetch that bypasses the server-side 1-hour cache
+  const [bust, setBust] = useState(0);
+
+  const swrKey = bust > 0
+    ? `/api/listing-changes?bust=${bust}`
+    : "/api/listing-changes";
+
   const { data, error, isLoading, mutate } = useSWR<ListingChangesResponse>(
-    "/api/listing-changes",
+    swrKey,
     fetcher,
-    { refreshInterval: REFRESH, revalidateOnFocus: false }
+    {
+      // Don't auto-refresh — data is live on first load, manual refresh is enough
+      refreshInterval: 0,
+      revalidateOnFocus: false,
+    }
   );
-  return { changes: data?.changes ?? [], error, isLoading, refresh: mutate };
+
+  const refresh = useCallback(() => {
+    setBust((b) => b + 1);
+  }, []);
+
+  return {
+    changes:      data?.changes ?? [],
+    cached:       data?.cached ?? false,
+    fetchedAt:    data?.fetchedAt ?? null,
+    sitesChecked: data?.sitesChecked ?? 0,
+    error,
+    isLoading,
+    refresh,
+  };
 }

@@ -76,7 +76,7 @@ const GMAIL_PASS       = process.env.GMAIL_APP_PASSWORD ?? "";
 const REALTYAPI_KEY    = process.env.REALTYAPI_KEY      ?? "";
 const REALTYAPI_MOCK   = process.env.REALTYAPI_MOCK === "true";
 const REALTYAPI_BASE   = "https://zillow.realtyapi.io";
-const WINDOW_DAYS      = 60;
+const WINDOW_DAYS      = 90;
 const MAX_LOG_ENTRIES  = 200;
 const TEST_LIMIT       = process.env.TEST_LIMIT ? parseInt(process.env.TEST_LIMIT) : 0; // 0 = no limit
 

@@ -376,17 +376,40 @@ function ChangeCard({
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
 export function ListingStatusPanel() {
-  const { changes, isLoading, error } = useListingChanges();
+  const { changes, isLoading, error, refresh, fetchedAt, cached } = useListingChanges();
   const { dismissed, dismiss, restoreAll } = useDismissed();
   const [editCount, setEditCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Load edit count on mount (client only)
   useEffect(() => { setEditCount(countEdits()); }, []);
 
   const refreshEditCount = useCallback(() => setEditCount(countEdits()), []);
 
-  if (isLoading) return <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>;
-  if (error)     return <ErrorBanner message={error.message} />;
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    refresh();
+    // Give it time to settle — the hook resolves when SWR finishes
+    setTimeout(() => setRefreshing(false), 6000);
+  }, [refresh]);
+
+  // Friendly "X min ago" label
+  const fetchedAgo = fetchedAt
+    ? (() => {
+        const mins = Math.round((Date.now() - new Date(fetchedAt).getTime()) / 60_000);
+        if (mins < 1) return "just now";
+        if (mins === 1) return "1 min ago";
+        return `${mins} min ago`;
+      })()
+    : null;
+
+  if (isLoading) return (
+    <div className="flex flex-col items-center gap-3 py-12 text-gray-400">
+      <LoadingSpinner size="lg" />
+      <p className="text-sm">Checking 90-day listings via Zillow…</p>
+    </div>
+  );
+  if (error) return <ErrorBanner message={error.message} />;
 
   const visible    = changes
     .filter((c) => !dismissed.has(c.id))
@@ -412,21 +435,32 @@ export function ListingStatusPanel() {
             ✨ {editCount} example{editCount !== 1 ? "s" : ""} learned
           </span>
         )}
-        {nDismissed > 0 && (
-          <button onClick={restoreAll} className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">
-            Show {nDismissed} dismissed
+        <div className="ml-auto flex items-center gap-3">
+          {fetchedAgo && (
+            <span className="text-xs text-gray-400" title={fetchedAt ?? ""}>
+              {cached ? "cached" : "live"} · {fetchedAgo}
+            </span>
+          )}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || isLoading}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <span className={refreshing ? "animate-spin inline-block" : "inline-block"}>↻</span>
+            {refreshing ? "Checking…" : "Refresh"}
           </button>
-        )}
+          {nDismissed > 0 && (
+            <button onClick={restoreAll} className="text-xs text-gray-400 hover:text-gray-600 underline">
+              Show {nDismissed} dismissed
+            </button>
+          )}
+        </div>
       </div>
 
       {visible.length === 0 && nDismissed === 0 ? (
         <div className="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm">
           <p className="text-sm text-gray-400 italic">
-            No listing changes detected yet. Run{" "}
-            <code className="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">
-              npm run listing-checker
-            </code>{" "}
-            to populate.
+            No listings in a noteworthy state in the last 90 days. All good!
           </p>
         </div>
       ) : visible.length === 0 ? (
