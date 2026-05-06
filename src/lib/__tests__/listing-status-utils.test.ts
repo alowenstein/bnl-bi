@@ -82,8 +82,33 @@ describe("detectChange", () => {
     expect(detectChange(makeSnap("Unknown"), "Pending", null)).toBe("pending");
   });
 
+  // Transitions FROM contingent states (previously missed)
+  it("detects Pending → Sold", () => {
+    expect(detectChange(makeSnap("Pending"), "Sold", null)).toBe("sold");
+  });
+
+  it("detects Under Contract → Sold", () => {
+    expect(detectChange(makeSnap("Under Contract"), "Sold", null)).toBe("sold");
+  });
+
+  it("detects Accepting Backup Offers → Sold", () => {
+    expect(detectChange(makeSnap("Accepting Backup Offers"), "Sold", null)).toBe("sold");
+  });
+
+  it("detects Pending → Off Market", () => {
+    expect(detectChange(makeSnap("Pending"), "Off Market", null)).toBe("off_market");
+  });
+
+  it("detects Accepting Backup Offers → Off Market", () => {
+    expect(detectChange(makeSnap("Accepting Backup Offers"), "Off Market", null)).toBe("off_market");
+  });
+
   it("detects Pending → For Sale as back_on_market", () => {
     expect(detectChange(makeSnap("Pending"), "For Sale", 875_000)).toBe("back_on_market");
+  });
+
+  it("detects Accepting Backup Offers → For Sale as back_on_market", () => {
+    expect(detectChange(makeSnap("Accepting Backup Offers"), "For Sale", 850_000)).toBe("back_on_market");
   });
 
   it("detects Off Market → For Sale as back_on_market", () => {

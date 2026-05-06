@@ -22,16 +22,19 @@ export function detectChange(
   status: ListingStatus,
   price: number | null
 ): ChangeType | null {
-  const prev       = snap.lastStatus;
-  const wasActive  = prev === "For Sale" || prev === "Unknown";
+  const prev          = snap.lastStatus;
+  const wasActive     = prev === "For Sale" || prev === "Unknown";
+  const wasContingent = prev === "Pending" || prev === "Under Contract" || prev === "Accepting Backup Offers";
 
   if (wasActive && (status === "Pending" || status === "Under Contract")) return "pending";
   if (wasActive && status === "Accepting Backup Offers")                   return "backup_offers";
-  if (wasActive && status === "Sold")                                      return "sold";
-  if (wasActive && status === "Off Market")                                return "off_market";
 
-  const wasContingent = ["Pending", "Under Contract", "Accepting Backup Offers", "Off Market"].includes(prev);
-  if (status === "For Sale" && wasContingent)                              return "back_on_market";
+  // Sold and Off Market are terminal — detect from ANY prior active/contingent state
+  // (Pending→Sold, Backup Offers→Sold, etc. were previously missed)
+  if ((wasActive || wasContingent) && status === "Sold")                  return "sold";
+  if ((wasActive || wasContingent) && status === "Off Market")            return "off_market";
+
+  if (status === "For Sale" && (wasContingent || prev === "Off Market"))  return "back_on_market";
 
   if (
     status === "For Sale" &&
