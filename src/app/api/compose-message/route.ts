@@ -33,7 +33,10 @@ const EVENT_LABELS: Record<ChangeType, string> = {
  * message reads naturally: "2211 W Windrose Dr" → "Windrose Dr"
  */
 function streetName(address: string): string {
-  return address.replace(/^\d+\s+(?:[NSEW]\s+)?/i, "").trim();
+  return address
+    .replace(/^\d+\s+(?:[NSEW]\s+)?/i, "")   // strip leading number + directional
+    .replace(/\s+(?:unit|apt|suite|#)\s*\S+/gi, "") // strip unit/apt suffix
+    .trim();
 }
 
 export async function POST(req: Request) {

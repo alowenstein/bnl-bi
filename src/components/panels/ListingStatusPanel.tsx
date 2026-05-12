@@ -94,9 +94,12 @@ function fmt(p: number | null) {
   return p === null ? "—" : `$${p.toLocaleString()}`;
 }
 
-/** "2211 W Windrose Dr" → "Windrose Dr" */
+/** "2211 W Windrose Dr" → "Windrose Dr", "9450 E Becker Ln unit 2034" → "Becker Ln" */
 function streetName(address: string): string {
-  return address.replace(/^\d+\s+(?:[NSEW]\s+)?/i, "").trim();
+  return address
+    .replace(/^\d+\s+(?:[NSEW]\s+)?/i, "")   // strip leading number + directional
+    .replace(/\s+(?:unit|apt|suite|#)\s*\S+/gi, "") // strip unit/apt suffix
+    .trim();
 }
 
 function fallbackMessage(c: ListingChange): string {
