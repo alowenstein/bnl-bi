@@ -244,7 +244,7 @@ export async function GET(req: Request) {
     const photoUrl = getFirstPhotoUrl(site) ?? zillowPhoto;
 
     changes.push({
-      id:             `${site.sid}-${now}`,
+      id:             `${site.sid}-${changeType}`, // stable across fetches so dismiss persists
       sid:            site.sid,
       address:        site.address,
       address2:       site.address2?.trim() || null,
