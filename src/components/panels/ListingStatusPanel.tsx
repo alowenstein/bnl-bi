@@ -94,16 +94,21 @@ function fmt(p: number | null) {
   return p === null ? "—" : `$${p.toLocaleString()}`;
 }
 
+/** "2211 W Windrose Dr" → "Windrose Dr" */
+function streetName(address: string): string {
+  return address.replace(/^\d+\s+(?:[NSEW]\s+)?/i, "").trim();
+}
+
 function fallbackMessage(c: ListingChange): string {
-  const name = c.agentName.trim().split(" ")[0];
-  const addr = c.address;
+  const name   = c.agentName.trim().split(" ")[0];
+  const street = streetName(c.address);
   switch (c.changeType) {
-    case "sold":           return `Hi ${name}, congrats on closing ${addr}! 🎉`;
-    case "pending":        return `Hi ${name}, congrats on getting ${addr} under contract!`;
-    case "backup_offers":  return `Hi ${name}, congrats on ${addr} going under contract!`;
-    case "back_on_market": return `Hi ${name}, congrats on ${addr} coming back on the market!`;
-    case "price_change":   return `Hi ${name}, congrats on the price update on ${addr} to ${fmt(c.currentPrice)}!`;
-    case "off_market":     return `Hi ${name}, congrats on ${addr}!`;
+    case "sold":           return `Congrats on closing ${street}, ${name}!`;
+    case "pending":        return `${name}, congrats on getting ${street} under contract!`;
+    case "backup_offers":  return `${name}, congrats on ${street} going under contract!`;
+    case "back_on_market": return `${name}, good to see ${street} back on the market!`;
+    case "price_change":   return `${name}, congrats on the price update on ${street} — now at ${fmt(c.currentPrice)}.`;
+    case "off_market":     return `${name}, hope everything's going well with ${street}!`;
   }
 }
 

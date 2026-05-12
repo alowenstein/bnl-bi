@@ -28,33 +28,42 @@ const EVENT_LABELS: Record<ChangeType, string> = {
   off_market:     "went off market",
 };
 
+/**
+ * Strip the street number and cardinal direction from an address so the
+ * message reads naturally: "2211 W Windrose Dr" → "Windrose Dr"
+ */
+function streetName(address: string): string {
+  return address.replace(/^\d+\s+(?:[NSEW]\s+)?/i, "").trim();
+}
+
 export async function POST(req: Request) {
   const { changeType, agentName, address, currentPrice, examples } =
     await req.json() as ComposeRequest;
 
   const firstName = agentName.trim().split(" ")[0];
+  const street    = streetName(address);
 
   const examplesBlock = examples.length > 0
-    ? "\nHere are previous messages you sent and how you improved them. Match this evolving style:\n\n" +
+    ? "\nHere are real messages Assaf sent and then improved. Mirror this style exactly:\n\n" +
       examples
-        .slice(-5) // most recent 5
-        .map((e, i) => `Example ${i + 1}:\nOriginal: ${e.original}\nYours: ${e.edited}`)
+        .slice(-5)
+        .map((e, i) => `Example ${i + 1}:\nDraft: ${e.original}\nSent: ${e.edited}`)
         .join("\n\n") +
       "\n"
     : "";
 
   const priceNote = currentPrice && changeType === "price_change"
-    ? ` The new price is $${currentPrice.toLocaleString()}.`
+    ? ` New price is $${currentPrice.toLocaleString()}.`
     : "";
 
-  const prompt = `You write short, warm text messages from Assaf (a real estate photographer at Builds 'n Lenses Media) to agents congratulating them on a listing status change. The tone is genuine and personal — like a text from a friend in the industry. No sales pitch, no self-promotion, just a sincere congrats. Keep it 1–2 sentences max.
+  const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis unless the example style uses them. No self-promotion. One or two short sentences max.
 ${examplesBlock}
-Now write a message for:
-- Agent: ${firstName}
-- Property: ${address}
-- Event: ${EVENT_LABELS[changeType]}${priceNote}
+Write a message for:
+- Agent first name: ${firstName}
+- Street: ${street}
+- What happened: ${EVENT_LABELS[changeType]}${priceNote}
 
-Write only the message text. No quotes.`;
+Reply with only the message text.`;
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5",
