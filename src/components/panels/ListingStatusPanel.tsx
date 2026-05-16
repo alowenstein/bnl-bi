@@ -34,14 +34,14 @@ const LS_EDITS     = "bnl-message-edits";
 const MAX_EDITS_PER_TYPE = 5;
 
 function useDismissed() {
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
+  // Lazy initializer reads localStorage synchronously on first render so
+  // dismissed IDs are known before SWR data arrives — no flash of dismissed cards.
+  const [dismissed, setDismissed] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(LS_DISMISSED);
-      if (raw) setDismissed(new Set(JSON.parse(raw) as string[]));
-    } catch { /* ignore */ }
-  }, []);
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch { return new Set(); }
+  });
 
   const dismiss = useCallback((id: string) => {
     setDismissed((prev) => {
