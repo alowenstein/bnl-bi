@@ -477,8 +477,10 @@ async function main() {
   const allSites = await fetchSites();
   console.log(`   ${allSites.length} sites total`);
 
-  const sites = allSites.filter((s) => withinWindow(s.created, WINDOW_DAYS));
-  console.log(`   ${sites.length} sites in last ${WINDOW_DAYS} days`);
+  const sites = allSites.filter(
+    (s) => s.status === "active" && withinWindow(s.created, WINDOW_DAYS)
+  );
+  console.log(`   ${sites.length} active (delivered) sites in last ${WINDOW_DAYS} days`);
 
   if (sites.length === 0) {
     console.log("✅ No sites in window. Nothing to check.");

@@ -63,7 +63,7 @@ let cache: CacheEntry | null = null;
 // ── HDPH ──────────────────────────────────────────────────────────────────────
 
 interface HdphSite {
-  sid: number; bid: number; created: string;
+  sid: number; bid: number; created: string; status: string;
   address: string; address2?: string; city?: string; state?: string; zip?: string;
   mls?: string; price?: number;
   user: { name: string; email: string; phone?: string };
@@ -216,8 +216,11 @@ export async function GET(req: Request) {
   const now = new Date().toISOString();
 
   // 1. Fetch all HDPH sites, filter to window
+  // Require status === "active" so pre-shoot orders (not yet photographed) are excluded
   const allSites  = await fetchHdphSites();
-  const sites     = allSites.filter((s) => withinWindow(s.created, WINDOW_DAYS));
+  const sites     = allSites.filter(
+    (s) => s.status === "active" && withinWindow(s.created, WINDOW_DAYS)
+  );
 
   // 2. Query RealtyAPI for all sites in parallel
   const apiResults = await Promise.allSettled(
