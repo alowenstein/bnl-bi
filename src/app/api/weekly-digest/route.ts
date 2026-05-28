@@ -151,10 +151,10 @@ async function composeMessage(entry: ListingEntry): Promise<string> {
     ? ` New price is $${entry.currentPrice.toLocaleString()}.`
     : "";
   const priceHint  = entry.displayStatus === "price_change"
-    ? " Assaf is a real estate photographer — the angle is: a price drop is a great time to refresh the listing with new photos or updated marketing visuals to re-energize buyer interest. Offer to help without being pushy. Keep it casual."
+    ? " Assaf is a real estate photographer. For a price drop, suggest one of these (pick the most natural fit): swapping the hero photo on Zillow to give the listing a fresh look, or filming a quick short video themselves highlighting the new price point. Do NOT suggest a new photo shoot — that's too salesy. Keep it casual, like a tip from a colleague."
     : "";
 
-  const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis. No self-promotion. One or two short sentences max.${priceHint}
+  const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis. No self-promotion. One or two short sentences max. Never write a generic "just checking in" message — always acknowledge the specific event that happened.${priceHint}
 
 Write a message for:
 - Agent first name: ${firstName}
