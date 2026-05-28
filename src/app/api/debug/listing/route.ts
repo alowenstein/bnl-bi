@@ -16,8 +16,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const address = searchParams.get("address")?.trim();
 
-  if (!address) {
-    return NextResponse.json({ error: "Missing ?address= param" }, { status: 400 });
+  if (!address || address.length > 300) {
+    return NextResponse.json({ error: "Missing or invalid ?address= param" }, { status: 400 });
   }
 
   if (!REALTYAPI_KEY) {

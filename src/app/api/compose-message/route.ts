@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import type { DisplayStatus } from "@/types/listing-status";
+import { streetName } from "@/lib/listing-utils";
 
 const client = new Anthropic();
 
@@ -28,16 +29,6 @@ const EVENT_LABELS: Record<DisplayStatus, string> = {
   for_sale:       "is still for sale",
 };
 
-/**
- * Strip the street number and cardinal direction from an address so the
- * message reads naturally: "2211 W Windrose Dr" → "Windrose Dr"
- */
-function streetName(address: string): string {
-  return address
-    .replace(/^\d+\s+(?:[NSEW]\s+)?/i, "")   // strip leading number + directional
-    .replace(/\s+(?:unit|apt|suite|#)\s*\S+/gi, "") // strip unit/apt suffix
-    .trim();
-}
 
 export async function POST(req: Request) {
   const { changeType, agentName, address, currentPrice, examples } =
