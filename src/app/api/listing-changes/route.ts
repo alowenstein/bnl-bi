@@ -291,10 +291,14 @@ export async function GET(req: Request) {
   const now = new Date().toISOString();
 
   // 1. Fetch all HDPH sites, filter to 90-day window of active (delivered) shoots
-  const allSites = await fetchHdphSites();
-  const sites    = allSites.filter(
+  const allSites    = await fetchHdphSites();
+  const activeOnly  = allSites.filter((s) => s.status === "active");
+  const inWindow    = allSites.filter((s) => withinWindow(s.created, WINDOW_DAYS));
+  const sites       = allSites.filter(
     (s) => s.status === "active" && withinWindow(s.created, WINDOW_DAYS)
   );
+  // Sample statuses from the in-window sites (before active filter) for debugging
+  const statusSample = [...new Set(inWindow.map((s) => s.status))].slice(0, 10);
 
   // 2. Query RealtyAPI for all sites in parallel
   const apiResults = await Promise.allSettled(
@@ -329,7 +333,13 @@ export async function GET(req: Request) {
     cached:          false,
     fetchedAt:       now,
     sitesChecked:    sites.length,
-    hdphTotal:       allSites.length,
-    realtyApiHits,
+    debug: {
+      hdphTotal:     allSites.length,
+      activeCount:   activeOnly.length,
+      inWindowCount: inWindow.length,
+      finalCount:    sites.length,
+      statusSample,
+      realtyApiHits,
+    },
   });
 }
