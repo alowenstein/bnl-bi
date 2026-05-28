@@ -301,6 +301,11 @@ export async function GET(req: Request) {
     sites.map((site) => fetchRealtyApiStatus(site))
   );
 
+  // Count how many RealtyAPI calls succeeded
+  const realtyApiHits = apiResults.filter(
+    (r) => r.status === "fulfilled" && r.value !== null
+  ).length;
+
   // 3. Determine display status for each listing
   const listings: ListingEntry[] = [];
 
@@ -321,8 +326,10 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     listings,
-    cached:       false,
-    fetchedAt:    now,
-    sitesChecked: sites.length,
+    cached:          false,
+    fetchedAt:       now,
+    sitesChecked:    sites.length,
+    hdphTotal:       allSites.length,
+    realtyApiHits,
   });
 }
