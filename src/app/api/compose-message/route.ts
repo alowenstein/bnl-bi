@@ -24,7 +24,7 @@ const EVENT_LABELS: Record<DisplayStatus, string> = {
   sold:           "sold / closed",
   pending:        "went pending / under contract",
   backup_offers:  "is contingent / accepting backup offers",
-  price_change:   "had a price change",
+  price_change:   "had a price reduction",
   off_market:     "went off market",
   for_sale:       "is still for sale",
 };
@@ -50,7 +50,11 @@ export async function POST(req: Request) {
     ? ` New price is $${currentPrice.toLocaleString()}.`
     : "";
 
-  const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis unless the example style uses them. No self-promotion. One or two short sentences max.
+  const priceChangeHint = changeType === "price_change"
+    ? " Assaf is a real estate photographer — the angle is: a price drop is a great time to refresh the listing with new photos or updated marketing visuals to re-energize buyer interest. Offer to help without being pushy. Keep it casual."
+    : "";
+
+  const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis unless the example style uses them. No self-promotion. One or two short sentences max.${priceChangeHint}
 ${examplesBlock}
 Write a message for:
 - Agent first name: ${firstName}

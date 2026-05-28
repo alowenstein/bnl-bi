@@ -102,7 +102,7 @@ function fallbackMessage(entry: ListingEntry): string {
     case "sold":           return `Congrats on closing ${street}, ${name}!`;
     case "pending":        return `${name}, congrats on getting ${street} under contract!`;
     case "backup_offers":  return `${name}, congrats on ${street} going under contract!`;
-    case "price_change":   return `${name}, congrats on the price update on ${street} — now at ${fmt(entry.currentPrice)}.`;
+    case "price_change":   return `Hey ${name}, saw ${street} just had a price adjustment — if you want fresh photos or updated marketing content to push the new price, I'm around!`;
     case "off_market":     return `${name}, hope everything's going well with ${street}!`;
     default:               return `Hey ${name}, just checking in on ${street}.`;
   }
@@ -389,12 +389,22 @@ function ListingCard({
 
 type View = "noteworthy" | "for_sale";
 
+// Filter chips shown in the noteworthy view, in display order
+const FILTER_CHIPS: { status: DisplayStatus; label: string; active: string; inactive: string }[] = [
+  { status: "sold",          label: "Sold",           active: "bg-green-600 text-white",  inactive: "bg-green-50 text-green-700 hover:bg-green-100" },
+  { status: "pending",       label: "Pending",         active: "bg-yellow-500 text-white", inactive: "bg-yellow-50 text-yellow-700 hover:bg-yellow-100" },
+  { status: "backup_offers", label: "Backup Offers",   active: "bg-orange-500 text-white", inactive: "bg-orange-50 text-orange-700 hover:bg-orange-100" },
+  { status: "price_change",  label: "Price Change",    active: "bg-blue-600 text-white",   inactive: "bg-blue-50 text-blue-700 hover:bg-blue-100" },
+  { status: "off_market",    label: "Off Market",      active: "bg-gray-600 text-white",   inactive: "bg-gray-100 text-gray-600 hover:bg-gray-200" },
+];
+
 export function ListingStatusPanel() {
   const { listings, isLoading, error, refresh, fetchedAt, cached } = useListingChanges();
   const { dismissed, dismiss, restoreAll } = useDismissed();
-  const [editCount, setEditCount]   = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [view, setView]             = useState<View>("noteworthy");
+  const [editCount, setEditCount]       = useState(0);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [view, setView]                 = useState<View>("noteworthy");
+  const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all");
 
   useEffect(() => { setEditCount(countEdits()); }, []);
 
@@ -405,6 +415,11 @@ export function ListingStatusPanel() {
     refresh();
     setTimeout(() => setRefreshing(false), 6000);
   }, [refresh]);
+
+  const handleToggleView = useCallback(() => {
+    setView((v) => v === "noteworthy" ? "for_sale" : "noteworthy");
+    setStatusFilter("all");
+  }, []);
 
   const fetchedAgo = fetchedAt
     ? (() => {
@@ -423,12 +438,20 @@ export function ListingStatusPanel() {
   );
   if (error) return <ErrorBanner message={error.message} />;
 
-  // Partition into noteworthy (status changes + price changes) vs. for sale
+  // Partition into noteworthy vs. for sale, then apply status filter
   const noteworthy = listings.filter((l) => l.displayStatus !== "for_sale");
   const forSale    = listings.filter((l) => l.displayStatus === "for_sale");
-  const pool       = view === "noteworthy" ? noteworthy : forSale;
+  const pool       = view === "noteworthy"
+    ? (statusFilter === "all" ? noteworthy : noteworthy.filter((l) => l.displayStatus === statusFilter))
+    : forSale;
   const visible    = pool.filter((l) => !dismissed.has(l.id));
   const nDismissed = pool.filter((l) =>  dismissed.has(l.id)).length;
+
+  // Count per status for chip labels
+  const statusCounts = noteworthy.reduce<Partial<Record<DisplayStatus, number>>>((acc, l) => {
+    acc[l.displayStatus] = (acc[l.displayStatus] ?? 0) + 1;
+    return acc;
+  }, {});
 
   const toggleLabel = view === "noteworthy"
     ? `Show For Sale (${forSale.length})`
@@ -458,7 +481,7 @@ export function ListingStatusPanel() {
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           {/* Toggle view */}
           <button
-            onClick={() => setView((v) => v === "noteworthy" ? "for_sale" : "noteworthy")}
+            onClick={handleToggleView}
             className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
           >
             {toggleLabel}
@@ -490,6 +513,33 @@ export function ListingStatusPanel() {
         </div>
       </div>
 
+      {/* Status filter chips — only in noteworthy view when >1 type present */}
+      {view === "noteworthy" && Object.keys(statusCounts).length > 1 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              statusFilter === "all"
+                ? "bg-gray-800 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            All ({noteworthy.length})
+          </button>
+          {FILTER_CHIPS.filter((c) => (statusCounts[c.status] ?? 0) > 0).map((c) => (
+            <button
+              key={c.status}
+              onClick={() => setStatusFilter(statusFilter === c.status ? "all" : c.status)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                statusFilter === c.status ? c.active : c.inactive
+              }`}
+            >
+              {c.label} ({statusCounts[c.status]})
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Cards */}
       {visible.length === 0 && nDismissed === 0 ? (
         <div className="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm">
@@ -507,7 +557,7 @@ export function ListingStatusPanel() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
           {visible.map((entry) => (
             <ListingCard
               key={entry.id}
