@@ -291,11 +291,14 @@ export async function GET(req: Request) {
   const now = new Date().toISOString();
 
   // 1. Fetch all HDPH sites, filter to delivered shoots within the 90-day window.
-  //    "activated" is set when HDPH delivers the media — null/empty = not yet shot.
-  //    We use created for the window so recently-booked but undelivered shoots are excluded.
+  //    "Has at least one non-hidden still photo" is the most reliable signal that
+  //    the shoot has happened and media has been delivered. Pre-shoot orders have
+  //    no photos yet, so they're excluded automatically.
   const allSites    = await fetchHdphSites();
   const inWindow    = allSites.filter((s) => withinWindow(s.created, WINDOW_DAYS));
-  const sites       = inWindow.filter((s) => !!s.activated);
+  const sites       = inWindow.filter((s) =>
+    s.media?.some((m) => m.type === "still" && !m.hidden)
+  );
   const statusSample = [...new Set(inWindow.map((s) => s.status))].slice(0, 10);
 
   // 2. Query RealtyAPI for all sites in parallel
