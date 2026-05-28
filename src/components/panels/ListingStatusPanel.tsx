@@ -507,7 +507,7 @@ export function ListingStatusPanel() {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
           {visible.map((entry) => (
             <ListingCard
               key={entry.id}
