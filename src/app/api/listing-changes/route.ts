@@ -214,12 +214,10 @@ function determineListing(
   const shootMs   = new Date(shootDate).getTime();
   const photoUrl  = getFirstPhotoUrl(site) ?? zillowPhoto;
 
-  // For Sale or Unknown — check for a price change event since the shoot
+  // For Sale or Unknown — always bucket as for_sale (price change detection disabled for now)
   if (status === "For Sale" || status === "Unknown") {
-    const priceChange = detectPriceChange(priceHistory, shootDate);
-    const displayStatus: DisplayStatus = priceChange ? "price_change" : "for_sale";
     return {
-      id:            `${site.sid}-${displayStatus}`,
+      id:            `${site.sid}-for_sale`,
       sid:           site.sid,
       address:       site.address,
       address2:      site.address2?.trim() || null,
@@ -230,10 +228,10 @@ function determineListing(
       agentEmail:    site.user.email,
       agentPhone:    site.user.phone?.trim() || null,
       shotDate:      shootDate,
-      displayStatus,
-      statusDate:    priceChange?.statusDate ?? null,
+      displayStatus: "for_sale",
+      statusDate:    null,
       currentPrice:  price,
-      previousPrice: priceChange?.previousPrice ?? null,
+      previousPrice: null,
       listingUrl,
       hdphUrl,
       photoUrl,
