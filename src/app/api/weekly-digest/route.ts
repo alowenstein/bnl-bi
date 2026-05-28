@@ -285,8 +285,10 @@ export async function GET(req: Request) {
   if (!HDPH_KEY || !REALTYAPI_KEY) {
     return NextResponse.json({ error: "Missing HDPH or RealtyAPI credentials" }, { status: 503 });
   }
-  if (!GMAIL_USER || !GMAIL_PASS) {
-    return NextResponse.json({ error: "Missing Gmail credentials" }, { status: 503 });
+  const dryRun = new URL(req.url).searchParams.has("dry");
+
+  if (!dryRun && (!GMAIL_USER || !GMAIL_PASS)) {
+    return NextResponse.json({ error: "Missing Gmail credentials", gmailUser: !!GMAIL_USER, gmailPass: !!GMAIL_PASS }, { status: 503 });
   }
   if (!DIGEST_SECRET) {
     return NextResponse.json({ error: "Missing DIGEST_SECRET" }, { status: 503 });
@@ -338,7 +340,22 @@ export async function GET(req: Request) {
   const token      = buildApproveToken(sendJobs);
   const approveUrl = `${APP_URL}/api/approve-send?token=${encodeURIComponent(token)}`;
 
-  // 6. Send email
+  // 6. Send email (skip in dry-run mode)
+  if (dryRun) {
+    return NextResponse.json({
+      dryRun:        true,
+      listingCount:  allListings.length,
+      sendableCount: sendJobs.length,
+      listings:      allListings.map((e, i) => ({
+        address:     e.address,
+        status:      e.displayStatus,
+        agent:       e.agentName,
+        phone:       e.agentPhone,
+        message:     messages[i],
+      })),
+    });
+  }
+
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: { user: GMAIL_USER, pass: GMAIL_PASS },
