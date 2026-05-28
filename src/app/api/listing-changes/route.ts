@@ -43,7 +43,7 @@ let cache: CacheEntry | null = null;
 // ── HDPH ──────────────────────────────────────────────────────────────────────
 
 interface HdphSite {
-  sid: number; bid: number; created: string; status: string;
+  sid: number; bid: number; created: string; status: string; activated?: string;
   address: string; address2?: string; city?: string; state?: string; zip?: string;
   mls?: string; price?: number;
   user: { name: string; email: string; phone?: string };
@@ -290,14 +290,12 @@ export async function GET(req: Request) {
 
   const now = new Date().toISOString();
 
-  // 1. Fetch all HDPH sites, filter to 90-day window of active (delivered) shoots
+  // 1. Fetch all HDPH sites, filter to delivered shoots within the 90-day window.
+  //    "activated" is set when HDPH delivers the media — null/empty = not yet shot.
+  //    We use created for the window so recently-booked but undelivered shoots are excluded.
   const allSites    = await fetchHdphSites();
-  const activeOnly  = allSites.filter((s) => s.status === "active");
   const inWindow    = allSites.filter((s) => withinWindow(s.created, WINDOW_DAYS));
-  const sites       = allSites.filter(
-    (s) => s.status === "active" && withinWindow(s.created, WINDOW_DAYS)
-  );
-  // Sample statuses from the in-window sites (before active filter) for debugging
+  const sites       = inWindow.filter((s) => !!s.activated);
   const statusSample = [...new Set(inWindow.map((s) => s.status))].slice(0, 10);
 
   // 2. Query RealtyAPI for all sites in parallel
@@ -334,10 +332,9 @@ export async function GET(req: Request) {
     fetchedAt:       now,
     sitesChecked:    sites.length,
     debug: {
-      hdphTotal:     allSites.length,
-      activeCount:   activeOnly.length,
-      inWindowCount: inWindow.length,
-      finalCount:    sites.length,
+      hdphTotal:      allSites.length,
+      inWindowCount:  inWindow.length,
+      activatedCount: sites.length,
       statusSample,
       realtyApiHits,
     },
