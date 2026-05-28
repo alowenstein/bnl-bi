@@ -1,12 +1,11 @@
 import useSWR from "swr";
 import { useState, useCallback } from "react";
-import type { ListingChange } from "@/types/listing-status";
+import type { ListingEntry } from "@/types/listing-status";
 
 interface ListingChangesResponse {
-  changes: ListingChange[];
+  listings: ListingEntry[];
   cached: boolean;
   fetchedAt: string;
-  count: number;
   sitesChecked?: number;
 }
 
@@ -40,12 +39,13 @@ export function useListingChanges() {
   }, []);
 
   return {
-    changes:      data?.changes ?? [],
+    listings:     data?.listings ?? [],
     cached:       data?.cached ?? false,
     fetchedAt:    data?.fetchedAt ?? null,
     sitesChecked: data?.sitesChecked ?? 0,
     error,
     isLoading,
     refresh,
+    mutate,
   };
 }

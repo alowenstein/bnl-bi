@@ -7,6 +7,14 @@ export type ListingStatus =
   | "Off Market"
   | "Unknown";
 
+export type DisplayStatus =
+  | "for_sale"
+  | "price_change"
+  | "pending"
+  | "backup_offers"
+  | "sold"
+  | "off_market";
+
 export type ChangeType =
   | "pending"
   | "backup_offers"
@@ -59,6 +67,27 @@ export interface ListingChange {
   listingUrl: string;
   hdphUrl: string;            // link to HDPhotoHub admin page for this shoot
   photoUrl: string | null;    // first still photo from HDPH media[]
+}
+
+export interface ListingEntry {
+  id: string;              // "${sid}-${displayStatus}" for dismiss stability
+  sid: number;
+  address: string;
+  address2: string | null;
+  city: string;
+  state: string;
+  mls: string | null;
+  agentName: string;
+  agentEmail: string;
+  agentPhone: string | null;
+  shotDate: string;
+  displayStatus: DisplayStatus;
+  statusDate: string | null;
+  currentPrice: number | null;
+  previousPrice: number | null;   // price_change only
+  listingUrl: string;
+  hdphUrl: string;
+  photoUrl: string | null;
 }
 
 export interface SnapshotStore {

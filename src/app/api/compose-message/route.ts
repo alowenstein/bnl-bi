@@ -1,31 +1,31 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import type { ChangeType } from "@/types/listing-status";
+import type { DisplayStatus } from "@/types/listing-status";
 
 const client = new Anthropic();
 
 export interface MessageEdit {
-  changeType: ChangeType;
+  changeType: DisplayStatus;
   original: string;
   edited: string;
   savedAt: string;
 }
 
 interface ComposeRequest {
-  changeType: ChangeType;
+  changeType: DisplayStatus;
   agentName: string;
   address: string;
   currentPrice?: number | null;
   examples: MessageEdit[];
 }
 
-const EVENT_LABELS: Record<ChangeType, string> = {
+const EVENT_LABELS: Record<DisplayStatus, string> = {
   sold:           "sold / closed",
   pending:        "went pending / under contract",
   backup_offers:  "is contingent / accepting backup offers",
-  back_on_market: "came back on the market",
   price_change:   "had a price change",
   off_market:     "went off market",
+  for_sale:       "is still for sale",
 };
 
 /**

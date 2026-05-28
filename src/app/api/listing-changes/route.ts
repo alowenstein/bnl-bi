@@ -3,8 +3,16 @@
  *
  * Fetches the current 90-day HDPH shoot window live from HDPhotoHub,
  * looks up each property's current status on Zillow via RealtyAPI (all
- * calls in parallel), and returns listings that are in a noteworthy state
- * (Pending, Sold, Accepting Backup Offers, Off Market).
+ * calls in parallel), and returns ALL listings bucketed by DisplayStatus.
+ *
+ * - "for_sale"     — still active, no noteworthy change (hidden by default in UI)
+ * - "price_change" — price changed since the shoot date
+ * - "pending"      — went pending/under contract after the shoot
+ * - "backup_offers"— contingent/accepting backup offers after the shoot
+ * - "sold"         — closed after the shoot
+ * - "off_market"   — taken off market after the shoot
+ *
+ * Listings whose status event pre-dates the shoot are excluded entirely.
  *
  * Server-side cache: results are cached for 1 hour so repeated page loads
  * don't hammer the APIs. Pass ?bust=<anything> to force a fresh fetch.
@@ -13,34 +21,7 @@
  */
 
 import { NextResponse } from "next/server";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type ListingStatus =
-  | "For Sale" | "Pending" | "Under Contract"
-  | "Accepting Backup Offers" | "Sold" | "Off Market" | "Unknown";
-
-type ChangeType =
-  | "pending" | "backup_offers" | "sold" | "price_change"
-  | "back_on_market" | "off_market";
-
-interface ListingChange {
-  id: string;
-  sid: number;
-  address: string; address2: string | null; city: string; state: string;
-  mls: string | null;
-  agentName: string; agentEmail: string; agentPhone: string | null;
-  changeType: ChangeType;
-  previousStatus: ListingStatus; currentStatus: ListingStatus;
-  previousPrice: number | null;  currentPrice: number | null;
-  priceDelta: number | null;
-  shotDate: string;
-  statusDate: string | null;
-  detectedAt: string;
-  listingUrl: string;
-  hdphUrl: string;
-  photoUrl: string | null;
-}
+import type { DisplayStatus, ListingEntry } from "@/types/listing-status";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -55,9 +36,8 @@ const BROWSER_UA     =
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
 // ── Server-side in-memory cache ───────────────────────────────────────────────
-// Shared within a warm serverless instance; cold starts re-fetch automatically.
 
-interface CacheEntry { data: ListingChange[]; fetchedAt: number }
+interface CacheEntry { data: ListingEntry[]; fetchedAt: number }
 let cache: CacheEntry | null = null;
 
 // ── HDPH ──────────────────────────────────────────────────────────────────────
@@ -107,19 +87,28 @@ function getFirstPhotoUrl(site: HdphSite): string | null {
 
 // ── RealtyAPI ─────────────────────────────────────────────────────────────────
 
+type ZillowStatus = "For Sale" | "Pending" | "Under Contract" | "Accepting Backup Offers" | "Sold" | "Off Market" | "Unknown";
+
+interface PriceHistoryEntry {
+  date: string;
+  event: string;
+  price?: number;
+}
+
 interface RealtyApiResult {
-  status: ListingStatus;
+  status: ZillowStatus;
   price: number | null;
   listingUrl: string;
   statusDate: string | null;
   photoUrl: string | null;
+  priceHistory: PriceHistoryEntry[];
 }
 
-function mapRealtyApiStatus(
+function mapZillowStatus(
   homeStatus: string | undefined,
   subType?: Record<string, boolean> | null,
   contingentType?: string | null
-): ListingStatus {
+): ZillowStatus {
   if (!homeStatus) return "Unknown";
   if (contingentType)       return "Accepting Backup Offers";
   if (subType?.isPending)   return "Pending";
@@ -134,11 +123,11 @@ function mapRealtyApiStatus(
 }
 
 function getStatusDate(
-  history: { date: string; event: string }[] | null | undefined,
-  status: ListingStatus
+  history: PriceHistoryEntry[] | null | undefined,
+  status: ZillowStatus
 ): string | null {
   if (!history?.length) return null;
-  const keywords: Partial<Record<ListingStatus, string[]>> = {
+  const keywords: Partial<Record<ZillowStatus, string[]>> = {
     "Sold":                    ["sold"],
     "Pending":                 ["pending", "pending sale", "under contract"],
     "Accepting Backup Offers": ["contingent", "backup"],
@@ -169,33 +158,121 @@ async function fetchRealtyApiStatus(site: HdphSite): Promise<RealtyApiResult | n
     const pd = json.propertyDetails;
     if (!pd?.homeStatus) return null;
 
-    const status = mapRealtyApiStatus(
+    const status = mapZillowStatus(
       pd.homeStatus as string,
       pd.listingSubType as Record<string, boolean> | null,
       pd.contingentListingType as string | null
     );
+    const rawHistory = (pd.priceHistory as PriceHistoryEntry[] | null) ?? [];
     const price       = (pd.price as number | null) ?? null;
     const listingUrl  = pd.hdpUrl
       ? `https://www.zillow.com${pd.hdpUrl as string}`
       : `https://www.zillow.com/homes/${encodeURIComponent(fullAddress.replace(/\s+/g, "-"))}_rb/`;
-    const statusDate  = getStatusDate(pd.priceHistory as { date: string; event: string }[], status);
+    const statusDate  = getStatusDate(rawHistory, status);
     const photoUrl    = (pd.hiResImageLink as string | null) ?? null;
 
-    return { status, price, listingUrl, statusDate, photoUrl };
+    return { status, price, listingUrl, statusDate, photoUrl, priceHistory: rawHistory };
   } catch {
     return null;
   }
 }
 
-function statusToChangeType(status: ListingStatus): ChangeType | null {
-  switch (status) {
-    case "Pending":
-    case "Under Contract":          return "pending";
-    case "Accepting Backup Offers": return "backup_offers";
-    case "Sold":                    return "sold";
-    case "Off Market":              return "off_market";
-    default:                        return null;
+// ── Price change detection ────────────────────────────────────────────────────
+
+/**
+ * Searches priceHistory (newest-first) for a "price change" event that occurred
+ * on or after the shoot date. Returns the event date + the previous price entry.
+ */
+function detectPriceChange(
+  priceHistory: PriceHistoryEntry[],
+  shootDate: string,
+): { statusDate: string; previousPrice: number | null } | null {
+  const shootMs = new Date(shootDate).getTime();
+  const idx = priceHistory.findIndex(
+    (h) =>
+      h.event.toLowerCase().includes("price change") &&
+      new Date(h.date).getTime() >= shootMs
+  );
+  if (idx === -1) return null;
+  const prevEntry = priceHistory[idx + 1]; // older entry (array is newest-first)
+  return {
+    statusDate:    priceHistory[idx].date,
+    previousPrice: prevEntry?.price ?? null,
+  };
+}
+
+// ── Core listing determination ────────────────────────────────────────────────
+
+function determineListing(
+  site: HdphSite,
+  result: RealtyApiResult,
+  now: string,
+  hdphUrl: string,
+): ListingEntry | null {
+  const { status, price, listingUrl, statusDate, photoUrl: zillowPhoto, priceHistory } = result;
+  const shootDate = site.created;
+  const shootMs   = new Date(shootDate).getTime();
+  const photoUrl  = getFirstPhotoUrl(site) ?? zillowPhoto;
+
+  // For Sale or Unknown — check for a price change event since the shoot
+  if (status === "For Sale" || status === "Unknown") {
+    const priceChange = detectPriceChange(priceHistory, shootDate);
+    const displayStatus: DisplayStatus = priceChange ? "price_change" : "for_sale";
+    return {
+      id:            `${site.sid}-${displayStatus}`,
+      sid:           site.sid,
+      address:       site.address,
+      address2:      site.address2?.trim() || null,
+      city:          site.city   ?? "",
+      state:         site.state  ?? "",
+      mls:           site.mls    ?? null,
+      agentName:     site.user.name,
+      agentEmail:    site.user.email,
+      agentPhone:    site.user.phone?.trim() || null,
+      shotDate:      shootDate,
+      displayStatus,
+      statusDate:    priceChange?.statusDate ?? null,
+      currentPrice:  price,
+      previousPrice: priceChange?.previousPrice ?? null,
+      listingUrl,
+      hdphUrl,
+      photoUrl,
+    };
   }
+
+  // For all other statuses: exclude if the event pre-dates our shoot
+  if (statusDate && new Date(statusDate).getTime() < shootMs) return null;
+
+  const displayStatusMap: Partial<Record<ZillowStatus, DisplayStatus>> = {
+    "Pending":                 "pending",
+    "Under Contract":          "pending",
+    "Accepting Backup Offers": "backup_offers",
+    "Sold":                    "sold",
+    "Off Market":              "off_market",
+  };
+  const displayStatus = displayStatusMap[status];
+  if (!displayStatus) return null; // shouldn't happen given above guard
+
+  return {
+    id:            `${site.sid}-${displayStatus}`,
+    sid:           site.sid,
+    address:       site.address,
+    address2:      site.address2?.trim() || null,
+    city:          site.city   ?? "",
+    state:         site.state  ?? "",
+    mls:           site.mls    ?? null,
+    agentName:     site.user.name,
+    agentEmail:    site.user.email,
+    agentPhone:    site.user.phone?.trim() || null,
+    shotDate:      shootDate,
+    displayStatus,
+    statusDate,
+    currentPrice:  price,
+    previousPrice: null,
+    listingUrl,
+    hdphUrl,
+    photoUrl,
+  };
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -206,19 +283,18 @@ export async function GET(req: Request) {
   // Serve from cache if fresh and no bust requested
   if (!bust && cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
     return NextResponse.json({
-      changes:   cache.data,
-      cached:    true,
-      fetchedAt: new Date(cache.fetchedAt).toISOString(),
-      count:     cache.data.length,
+      listings:     cache.data,
+      cached:       true,
+      fetchedAt:    new Date(cache.fetchedAt).toISOString(),
+      sitesChecked: cache.data.length,
     });
   }
 
   const now = new Date().toISOString();
 
-  // 1. Fetch all HDPH sites, filter to window
-  // Require status === "active" so pre-shoot orders (not yet photographed) are excluded
-  const allSites  = await fetchHdphSites();
-  const sites     = allSites.filter(
+  // 1. Fetch all HDPH sites, filter to 90-day window of active (delivered) shoots
+  const allSites = await fetchHdphSites();
+  const sites    = allSites.filter(
     (s) => s.status === "active" && withinWindow(s.created, WINDOW_DAYS)
   );
 
@@ -227,61 +303,28 @@ export async function GET(req: Request) {
     sites.map((site) => fetchRealtyApiStatus(site))
   );
 
-  // 3. Build change entries for noteworthy statuses
-  const changes: ListingChange[] = [];
+  // 3. Determine display status for each listing
+  const listings: ListingEntry[] = [];
 
   for (let i = 0; i < sites.length; i++) {
     const site   = sites[i];
     const result = apiResults[i];
     if (result.status !== "fulfilled" || !result.value) continue;
 
-    const { status, price, listingUrl, statusDate, photoUrl: zillowPhoto } = result.value;
-
-    const changeType = statusToChangeType(status);
-    if (!changeType) continue; // For Sale / Unknown — not noteworthy
-
-    // Skip if the status event predates our shoot — pre-existing condition
-    if (statusDate && new Date(statusDate) < new Date(site.created)) continue;
-
-    const hdphUrl  = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
-    const photoUrl = getFirstPhotoUrl(site) ?? zillowPhoto;
-
-    changes.push({
-      id:             `${site.sid}-${changeType}`, // stable across fetches so dismiss persists
-      sid:            site.sid,
-      address:        site.address,
-      address2:       site.address2?.trim() || null,
-      city:           site.city   ?? "",
-      state:          site.state  ?? "",
-      mls:            site.mls    ?? null,
-      agentName:      site.user.name,
-      agentEmail:     site.user.email,
-      agentPhone:     site.user.phone?.trim() || null,
-      changeType,
-      previousStatus: "For Sale",
-      currentStatus:  status,
-      previousPrice:  price,
-      currentPrice:   price,
-      priceDelta:     null,
-      shotDate:       site.created,
-      statusDate,
-      detectedAt:     now,
-      listingUrl,
-      hdphUrl,
-      photoUrl,
-    });
+    const hdphUrl = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
+    const entry   = determineListing(site, result.value, now, hdphUrl);
+    if (entry) listings.push(entry);
   }
 
   // Sort oldest shoot first
-  changes.sort((a, b) => new Date(a.shotDate).getTime() - new Date(b.shotDate).getTime());
+  listings.sort((a, b) => new Date(a.shotDate).getTime() - new Date(b.shotDate).getTime());
 
-  cache = { data: changes, fetchedAt: Date.now() };
+  cache = { data: listings, fetchedAt: Date.now() };
 
   return NextResponse.json({
-    changes,
-    cached:    false,
-    fetchedAt: now,
-    count:     changes.length,
+    listings,
+    cached:       false,
+    fetchedAt:    now,
     sitesChecked: sites.length,
   });
 }
