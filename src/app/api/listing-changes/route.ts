@@ -2,36 +2,40 @@
  * GET /api/listing-changes
  *
  * Fetches the current 90-day HDPH shoot window live from HDPhotoHub,
- * looks up each property's current status on Zillow via RealtyAPI (all
- * calls in parallel), and returns ALL listings bucketed by DisplayStatus.
+ * looks up each property's current status on Zillow via RealtyAPI, and returns
+ * ALL listings bucketed by DisplayStatus.
  *
- * - "for_sale"     — still active, no noteworthy change (hidden by default in UI)
- * - "price_change" — price changed since the shoot date
- * - "pending"      — went pending/under contract after the shoot
- * - "backup_offers"— contingent/accepting backup offers after the shoot
- * - "sold"         — closed after the shoot
- * - "off_market"   — taken off market after the shoot
+ * - "for_sale"      — still active, no noteworthy change (hidden by default in UI)
+ * - "pending"       — went pending / under contract after the shoot
+ * - "backup_offers" — contingent / accepting backup offers after the shoot
+ * - "sold"          — closed after the shoot
+ * - "off_market"    — taken off market after the shoot
  *
  * Listings whose status event pre-dates the shoot are excluded entirely.
  *
- * Server-side cache: results are cached for 1 hour so repeated page loads
- * don't hammer the APIs. Pass ?bust=<anything> to force a fresh fetch.
- *
- * No mock data. No committed JSON. Always real.
+ * Server-side cache: results are cached for 1 hour. Pass ?bust=<anything> to
+ * force a fresh fetch. RealtyAPI calls are limited to 10 concurrent requests
+ * to avoid overwhelming the upstream API.
  */
 
 import { NextResponse } from "next/server";
-import type { DisplayStatus, ListingEntry } from "@/types/listing-status";
+import type { ListingEntry } from "@/types/listing-status";
+import {
+  mapZillowStatus, getStatusDate, determineListing,
+  type HdphSite, type RealtyApiResult, type PriceHistoryEntry,
+} from "@/lib/listing-utils";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const HDPH_BASE      = process.env.HDPH_BASE_URL ?? "https://order.buildsnlenses.com/api/v1";
-const HDPH_KEY       = process.env.HDPH_API_KEY  ?? "";
-const REALTYAPI_KEY  = process.env.REALTYAPI_KEY ?? "";
-const REALTYAPI_BASE = "https://zillow.realtyapi.io";
-const WINDOW_DAYS    = 90;
-const CACHE_TTL_MS   = 60 * 60 * 1000; // 1 hour
-const BROWSER_UA     =
+const HDPH_BASE           = process.env.HDPH_BASE_URL ?? "https://order.buildsnlenses.com/api/v1";
+const HDPH_KEY            = process.env.HDPH_API_KEY  ?? "";
+const REALTYAPI_KEY       = process.env.REALTYAPI_KEY ?? "";
+const REALTYAPI_BASE      = "https://zillow.realtyapi.io";
+const WINDOW_DAYS         = 90;
+const CACHE_TTL_MS        = 60 * 60 * 1000; // 1 hour
+const REALTYAPI_CONCURRENCY = 10;            // max parallel RealtyAPI calls
+const REALTYAPI_TIMEOUT_MS  = 10_000;        // abort individual call after 10 s
+const BROWSER_UA          =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
@@ -40,15 +44,28 @@ const BROWSER_UA     =
 interface CacheEntry { data: ListingEntry[]; fetchedAt: number }
 let cache: CacheEntry | null = null;
 
-// ── HDPH ──────────────────────────────────────────────────────────────────────
+// ── Concurrency limiter ───────────────────────────────────────────────────────
+// Runs at most `limit` of the given async tasks at once, returning results in
+// the same order as the input array (matching Promise.allSettled semantics).
 
-interface HdphSite {
-  sid: number; bid: number; created: string; status: string; activated?: string;
-  address: string; address2?: string; city?: string; state?: string; zip?: string;
-  mls?: string; price?: number;
-  user: { name: string; email: string; phone?: string };
-  media: { type: string; hidden: boolean; url?: string }[];
+async function pLimit<T>(
+  tasks: (() => Promise<T>)[],
+  limit: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let next = 0;
+  async function worker() {
+    while (next < tasks.length) {
+      const idx = next++;
+      try   { results[idx] = { status: "fulfilled", value: await tasks[idx]() }; }
+      catch (reason) { results[idx] = { status: "rejected", reason }; }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
 }
+
+// ── HDPH ──────────────────────────────────────────────────────────────────────
 
 async function fetchHdphSites(): Promise<HdphSite[]> {
   const res = await fetch(`${HDPH_BASE}/sites`, {
@@ -62,81 +79,27 @@ async function fetchHdphSites(): Promise<HdphSite[]> {
   // HDPH sometimes injects an ASP error page mid-JSON — recover what we can
   const htmlIdx = text.indexOf("<font");
   if (htmlIdx !== -1) {
-    const before = text.slice(0, htmlIdx);
+    const before  = text.slice(0, htmlIdx);
     const lastEnd = Math.max(before.lastIndexOf("}]},"), before.lastIndexOf("}]},\r"));
     text = lastEnd !== -1
       ? before.slice(0, lastEnd + 3) + "]"
       : before.slice(0, before.lastIndexOf("}") + 1) + "]";
   }
 
-  return JSON.parse(text) as HdphSite[];
+  try {
+    return JSON.parse(text) as HdphSite[];
+  } catch {
+    throw new Error(`HDPH JSON parse failed (length=${text.length})`);
+  }
 }
 
 function withinWindow(dateStr: string, days: number): boolean {
   const d = new Date(dateStr);
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  return !isNaN(d.getTime()) && d >= cutoff;
-}
-
-function getFirstPhotoUrl(site: HdphSite): string | null {
-  return site.media?.find(
-    (m) => m.type === "still" && !m.hidden && m.url && !m.url.endsWith("/z.jpg")
-  )?.url ?? null;
+  const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+  return !isNaN(d.getTime()) && d.getTime() >= cutoffMs;
 }
 
 // ── RealtyAPI ─────────────────────────────────────────────────────────────────
-
-type ZillowStatus = "For Sale" | "Pending" | "Under Contract" | "Accepting Backup Offers" | "Sold" | "Off Market" | "Unknown";
-
-interface PriceHistoryEntry {
-  date: string;
-  event: string;
-  price?: number;
-}
-
-interface RealtyApiResult {
-  status: ZillowStatus;
-  price: number | null;
-  listingUrl: string;
-  statusDate: string | null;
-  photoUrl: string | null;
-  priceHistory: PriceHistoryEntry[];
-}
-
-function mapZillowStatus(
-  homeStatus: string | undefined,
-  subType?: Record<string, boolean> | null,
-  contingentType?: string | null
-): ZillowStatus {
-  if (!homeStatus) return "Unknown";
-  if (contingentType)       return "Accepting Backup Offers";
-  if (subType?.isPending)   return "Pending";
-  switch (homeStatus) {
-    case "FOR_SALE":      return "For Sale";
-    case "PENDING":       return "Pending";
-    case "SOLD":
-    case "RECENTLY_SOLD": return "Sold";
-    case "OTHER":         return "Off Market";
-    default:              return "Unknown";
-  }
-}
-
-function getStatusDate(
-  history: PriceHistoryEntry[] | null | undefined,
-  status: ZillowStatus
-): string | null {
-  if (!history?.length) return null;
-  const keywords: Partial<Record<ZillowStatus, string[]>> = {
-    "Sold":                    ["sold"],
-    "Pending":                 ["pending", "pending sale", "under contract"],
-    "Accepting Backup Offers": ["contingent", "backup"],
-    "Off Market":              ["off market", "removed", "expired", "withdrawn"],
-  };
-  const keys = keywords[status] ?? [];
-  const match = history.find((h) => keys.some((k) => h.event.toLowerCase().includes(k)));
-  return match?.date ?? history[0]?.date ?? null;
-}
 
 async function fetchRealtyApiStatus(site: HdphSite): Promise<RealtyApiResult | null> {
   const fullAddress = [site.address, site.address2, site.city, site.state, site.zip]
@@ -147,10 +110,11 @@ async function fetchRealtyApiStatus(site: HdphSite): Promise<RealtyApiResult | n
     const res = await fetch(url, {
       headers: {
         "x-realtyapi-key": REALTYAPI_KEY,
-        "User-Agent": BROWSER_UA,
-        Accept: "application/json",
+        "User-Agent":      BROWSER_UA,
+        Accept:            "application/json",
       },
-      cache: "no-store",
+      cache:  "no-store",
+      signal: AbortSignal.timeout(REALTYAPI_TIMEOUT_MS),
     });
     if (!res.ok) return null;
 
@@ -161,15 +125,15 @@ async function fetchRealtyApiStatus(site: HdphSite): Promise<RealtyApiResult | n
     const status = mapZillowStatus(
       pd.homeStatus as string,
       pd.listingSubType as Record<string, boolean> | null,
-      pd.contingentListingType as string | null
+      pd.contingentListingType as string | null,
     );
     const rawHistory = (pd.priceHistory as PriceHistoryEntry[] | null) ?? [];
-    const price       = (pd.price as number | null) ?? null;
-    const listingUrl  = pd.hdpUrl
+    const price      = (pd.price as number | null) ?? null;
+    const listingUrl = pd.hdpUrl
       ? `https://www.zillow.com${pd.hdpUrl as string}`
       : `https://www.zillow.com/homes/${encodeURIComponent(fullAddress.replace(/\s+/g, "-"))}_rb/`;
-    const statusDate  = getStatusDate(rawHistory, status);
-    const photoUrl    = (pd.hiResImageLink as string | null) ?? null;
+    const statusDate = getStatusDate(rawHistory, status);
+    const photoUrl   = (pd.hiResImageLink as string | null) ?? null;
 
     return { status, price, listingUrl, statusDate, photoUrl, priceHistory: rawHistory };
   } catch {
@@ -177,104 +141,15 @@ async function fetchRealtyApiStatus(site: HdphSite): Promise<RealtyApiResult | n
   }
 }
 
-// ── Price change detection ────────────────────────────────────────────────────
-
-/**
- * Searches priceHistory (newest-first) for a "price change" event that occurred
- * on or after the shoot date. Returns the event date + the previous price entry.
- */
-function detectPriceChange(
-  priceHistory: PriceHistoryEntry[],
-  shootDate: string,
-): { statusDate: string; previousPrice: number | null } | null {
-  const shootMs = new Date(shootDate).getTime();
-  const idx = priceHistory.findIndex(
-    (h) =>
-      h.event.toLowerCase().includes("price change") &&
-      new Date(h.date).getTime() >= shootMs
-  );
-  if (idx === -1) return null;
-  const prevEntry = priceHistory[idx + 1]; // older entry (array is newest-first)
-  return {
-    statusDate:    priceHistory[idx].date,
-    previousPrice: prevEntry?.price ?? null,
-  };
-}
-
-// ── Core listing determination ────────────────────────────────────────────────
-
-function determineListing(
-  site: HdphSite,
-  result: RealtyApiResult,
-  hdphUrl: string,
-): ListingEntry | null {
-  const { status, price, listingUrl, statusDate, photoUrl: zillowPhoto, priceHistory } = result;
-  const shootDate = site.created;
-  const shootMs   = new Date(shootDate).getTime();
-  const photoUrl  = getFirstPhotoUrl(site) ?? zillowPhoto;
-
-  // For Sale or Unknown — always bucket as for_sale (price change detection disabled for now)
-  if (status === "For Sale" || status === "Unknown") {
-    return {
-      id:            `${site.sid}-for_sale`,
-      sid:           site.sid,
-      address:       site.address,
-      address2:      site.address2?.trim() || null,
-      city:          site.city   ?? "",
-      state:         site.state  ?? "",
-      mls:           site.mls    ?? null,
-      agentName:     site.user.name,
-      agentEmail:    site.user.email,
-      agentPhone:    site.user.phone?.trim() || null,
-      shotDate:      shootDate,
-      displayStatus: "for_sale",
-      statusDate:    null,
-      currentPrice:  price,
-      previousPrice: null,
-      listingUrl,
-      hdphUrl,
-      photoUrl,
-    };
-  }
-
-  // For all other statuses: exclude if the event pre-dates our shoot
-  if (statusDate && new Date(statusDate).getTime() < shootMs) return null;
-
-  const displayStatusMap: Partial<Record<ZillowStatus, DisplayStatus>> = {
-    "Pending":                 "pending",
-    "Under Contract":          "pending",
-    "Accepting Backup Offers": "backup_offers",
-    "Sold":                    "sold",
-    "Off Market":              "off_market",
-  };
-  const displayStatus = displayStatusMap[status];
-  if (!displayStatus) return null; // shouldn't happen given above guard
-
-  return {
-    id:            `${site.sid}-${displayStatus}`,
-    sid:           site.sid,
-    address:       site.address,
-    address2:      site.address2?.trim() || null,
-    city:          site.city   ?? "",
-    state:         site.state  ?? "",
-    mls:           site.mls    ?? null,
-    agentName:     site.user.name,
-    agentEmail:    site.user.email,
-    agentPhone:    site.user.phone?.trim() || null,
-    shotDate:      shootDate,
-    displayStatus,
-    statusDate,
-    currentPrice:  price,
-    previousPrice: null,
-    listingUrl,
-    hdphUrl,
-    photoUrl,
-  };
-}
-
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function GET(req: Request) {
+  // Surface misconfigured credentials immediately rather than making silent
+  // unauthenticated calls that fail mysteriously later.
+  if (!HDPH_KEY || !REALTYAPI_KEY) {
+    return NextResponse.json({ error: "Missing API credentials" }, { status: 503 });
+  }
+
   const bust = new URL(req.url).searchParams.has("bust");
 
   // Serve from cache if fresh and no bust requested
@@ -289,19 +164,18 @@ export async function GET(req: Request) {
 
   const now = new Date().toISOString();
 
-  // 1. Fetch all HDPH sites, filter to delivered shoots within the 90-day window.
-  //    "Has at least one non-hidden still photo" is the most reliable signal that
-  //    the shoot has happened and media has been delivered. Pre-shoot orders have
-  //    no photos yet, so they're excluded automatically.
+  // 1. Fetch all HDPH sites; keep only delivered shoots within the 90-day window.
+  //    "Has at least one non-hidden still photo" = media was delivered = shoot happened.
   const allSites = await fetchHdphSites();
   const sites    = allSites.filter(
     (s) => withinWindow(s.created, WINDOW_DAYS) &&
            s.media?.some((m) => m.type === "still" && !m.hidden)
   );
 
-  // 2. Query RealtyAPI for all sites in parallel
-  const apiResults = await Promise.allSettled(
-    sites.map((site) => fetchRealtyApiStatus(site))
+  // 2. Query RealtyAPI with a concurrency cap to avoid overwhelming the upstream API.
+  const apiResults = await pLimit(
+    sites.map((site) => () => fetchRealtyApiStatus(site)),
+    REALTYAPI_CONCURRENCY,
   );
 
   // 3. Determine display status for each listing

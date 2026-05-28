@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import type { ListingEntry, DisplayStatus } from "@/types/listing-status";
 import type { MessageEdit } from "@/app/api/compose-message/route";
+import { streetName } from "@/lib/listing-utils";
 
 // ── Labels & styles ───────────────────────────────────────────────────────────
 
@@ -93,13 +94,6 @@ function fmt(p: number | null) {
   return p === null ? "—" : `$${p.toLocaleString()}`;
 }
 
-/** "2211 W Windrose Dr" → "Windrose Dr", "9450 E Becker Ln unit 2034" → "Becker Ln" */
-function streetName(address: string): string {
-  return address
-    .replace(/^\d+\s+(?:[NSEW]\s+)?/i, "")
-    .replace(/\s+(?:unit|apt|suite|#)\s*\S+/gi, "")
-    .trim();
-}
 
 function fallbackMessage(entry: ListingEntry): string {
   const name   = entry.agentName.trim().split(" ")[0];
@@ -135,7 +129,7 @@ function SendButton({
   const phone = entry.agentPhone;
   if (!phone) return <span className="text-xs text-gray-400 italic">No phone on file</span>;
   if (state === "sent")  return <span className="text-xs font-medium text-green-600">✓ Sent</span>;
-  if (state === "error") return <span className="text-xs text-red-500" title={errorMsg}>✗ Failed — {errorMsg}</span>;
+  if (state === "error") return <span className="text-xs text-red-500">✗ {errorMsg}</span>;
 
   async function handleSend() {
     setState("sending");
@@ -161,7 +155,8 @@ function SendButton({
         onSent();
       }
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Send failed");
+      console.error("Send failed:", err);
+      setErrorMsg("Send failed — check phone number and try again.");
       setState("error");
     }
   }
