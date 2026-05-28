@@ -149,7 +149,7 @@ function fallbackMessage(entry: ListingEntry): string {
   switch (entry.displayStatus) {
     case "sold":           return `Congrats on closing ${street}, ${name}! Let me know if you need shots for the next one.`;
     case "pending":        return `${name}, congrats on getting ${street} under contract!`;
-    case "backup_offers":  return `${name}, congrats on ${street} going under contract!`;
+    case "backup_offers":  return `${name}, saw ${street} went contingent — hope it goes smoothly!`;
     case "price_change":   return `${name}, saw the price update on ${street} — how are you planning to market it? Happy to brainstorm if it helps.`;
     case "off_market":     return `${name}, hope everything's going well with ${street}. Let me know if you re-list.`;
     default:               return `${name}, wanted to touch base about ${street}.`;
@@ -163,11 +163,15 @@ async function composeMessage(entry: ListingEntry): Promise<string> {
   const priceNote  = entry.currentPrice && entry.displayStatus === "price_change"
     ? ` New price is $${entry.currentPrice.toLocaleString()}.`
     : "";
-  const priceHint  = entry.displayStatus === "price_change"
-    ? " Assaf is a real estate photographer. For a price drop, lead with a genuine question about how they plan to market the new price — then offer to brainstorm or jump on a quick call. Don't pitch anything specific. Keep it conversational, like a colleague reaching out. Do NOT mention new photo shoots."
-    : "";
+  const statusHint: Partial<Record<DisplayStatus, string>> = {
+    price_change:  " Lead with a genuine question about how they plan to market the new price — then offer to brainstorm or jump on a quick call. Don't pitch anything. Do NOT mention photos or photo shoots.",
+    pending:       " Just acknowledge the milestone warmly. One sentence, nothing more. Do NOT offer photos, services, or anything — just a genuine congrats.",
+    backup_offers: " Just acknowledge it went contingent and wish them well. Keep it warm and brief. Do NOT offer photos, services, or 'backup marketing' — just a genuine acknowledgment.",
+    sold:          " Congratulate on closing. Keep it brief. A light mention of being available for their next listing is fine, but do NOT make it salesy.",
+    off_market:    " Keep it brief and warm. Express hope things work out. Do NOT offer services.",
+  };
 
-  const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis. No self-promotion. One or two short sentences max. Never write a generic "just checking in" message — always acknowledge the specific event that happened.${priceHint}
+  const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis. One or two short sentences max. Never write a generic "just checking in" — always acknowledge the specific event.${statusHint[entry.displayStatus] ?? ""}
 
 Write a message for:
 - Agent first name: ${firstName}
@@ -320,7 +324,9 @@ export async function GET(req: Request) {
     CONCURRENCY,
   );
 
-  // 3. Build listings and keep only noteworthy ones
+  // 3. Build listings — keep noteworthy ones where the status event is recent
+  //    (within 8 days so we don't re-notify about stale changes in future digests)
+  const DIGEST_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
   const allListings: ListingEntry[] = [];
   for (let i = 0; i < sites.length; i++) {
     const site   = sites[i];
@@ -328,7 +334,10 @@ export async function GET(req: Request) {
     if (result.status !== "fulfilled" || !result.value) continue;
     const hdphUrl = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
     const entry   = determineListing(site, result.value, hdphUrl);
-    if (entry && entry.displayStatus !== "for_sale") allListings.push(entry);
+    if (!entry || entry.displayStatus === "for_sale") continue;
+    // Skip if we know the status event is older than 8 days (already notified last week)
+    if (entry.statusDate && Date.now() - new Date(entry.statusDate).getTime() > DIGEST_WINDOW_MS) continue;
+    allListings.push(entry);
   }
 
   allListings.sort((a, b) => new Date(a.shotDate).getTime() - new Date(b.shotDate).getTime());
