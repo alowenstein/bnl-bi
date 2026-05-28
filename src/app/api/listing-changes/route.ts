@@ -206,7 +206,6 @@ function detectPriceChange(
 function determineListing(
   site: HdphSite,
   result: RealtyApiResult,
-  now: string,
   hdphUrl: string,
 ): ListingEntry | null {
   const { status, price, listingUrl, statusDate, photoUrl: zillowPhoto, priceHistory } = result;
@@ -294,22 +293,16 @@ export async function GET(req: Request) {
   //    "Has at least one non-hidden still photo" is the most reliable signal that
   //    the shoot has happened and media has been delivered. Pre-shoot orders have
   //    no photos yet, so they're excluded automatically.
-  const allSites    = await fetchHdphSites();
-  const inWindow    = allSites.filter((s) => withinWindow(s.created, WINDOW_DAYS));
-  const sites       = inWindow.filter((s) =>
-    s.media?.some((m) => m.type === "still" && !m.hidden)
+  const allSites = await fetchHdphSites();
+  const sites    = allSites.filter(
+    (s) => withinWindow(s.created, WINDOW_DAYS) &&
+           s.media?.some((m) => m.type === "still" && !m.hidden)
   );
-  const statusSample = [...new Set(inWindow.map((s) => s.status))].slice(0, 10);
 
   // 2. Query RealtyAPI for all sites in parallel
   const apiResults = await Promise.allSettled(
     sites.map((site) => fetchRealtyApiStatus(site))
   );
-
-  // Count how many RealtyAPI calls succeeded
-  const realtyApiHits = apiResults.filter(
-    (r) => r.status === "fulfilled" && r.value !== null
-  ).length;
 
   // 3. Determine display status for each listing
   const listings: ListingEntry[] = [];
@@ -320,7 +313,7 @@ export async function GET(req: Request) {
     if (result.status !== "fulfilled" || !result.value) continue;
 
     const hdphUrl = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
-    const entry   = determineListing(site, result.value, now, hdphUrl);
+    const entry   = determineListing(site, result.value, hdphUrl);
     if (entry) listings.push(entry);
   }
 
@@ -331,15 +324,8 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     listings,
-    cached:          false,
-    fetchedAt:       now,
-    sitesChecked:    sites.length,
-    debug: {
-      hdphTotal:      allSites.length,
-      inWindowCount:  inWindow.length,
-      activatedCount: sites.length,
-      statusSample,
-      realtyApiHits,
-    },
+    cached:       false,
+    fetchedAt:    now,
+    sitesChecked: sites.length,
   });
 }
