@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     : "";
 
   const priceChangeHint = changeType === "price_change"
-    ? " Assaf is a real estate photographer. For a price drop, suggest one of these (pick the most natural fit): swapping the hero photo on Zillow to give the listing a fresh look, or filming a quick short video themselves highlighting the new price point. Do NOT suggest a new photo shoot — that's too salesy. Keep it casual, like a tip from a colleague."
+    ? " Assaf is a real estate photographer. For a price drop, lead with a genuine question about how they plan to market the new price — then offer to brainstorm or jump on a quick call. Don't pitch anything specific. Keep it conversational, like a colleague reaching out. Do NOT mention new photo shoots."
     : "";
 
   const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis unless the example style uses them. No self-promotion. One or two short sentences max.${priceChangeHint}

@@ -150,7 +150,7 @@ function fallbackMessage(entry: ListingEntry): string {
     case "sold":           return `Congrats on closing ${street}, ${name}! Let me know if you need shots for the next one.`;
     case "pending":        return `${name}, congrats on getting ${street} under contract!`;
     case "backup_offers":  return `${name}, congrats on ${street} going under contract!`;
-    case "price_change":   return `${name}, saw the price update on ${street} — might be worth swapping the hero photo on Zillow to give it a fresh look for buyers at the new price.`;
+    case "price_change":   return `${name}, saw the price update on ${street} — how are you planning to market it? Happy to brainstorm if it helps.`;
     case "off_market":     return `${name}, hope everything's going well with ${street}. Let me know if you re-list.`;
     default:               return `${name}, wanted to touch base about ${street}.`;
   }
@@ -164,7 +164,7 @@ async function composeMessage(entry: ListingEntry): Promise<string> {
     ? ` New price is $${entry.currentPrice.toLocaleString()}.`
     : "";
   const priceHint  = entry.displayStatus === "price_change"
-    ? " Assaf is a real estate photographer. For a price drop, suggest one of these (pick the most natural fit): swapping the hero photo on Zillow to give the listing a fresh look, or filming a quick short video themselves highlighting the new price point. Do NOT suggest a new photo shoot — that's too salesy. Keep it casual, like a tip from a colleague."
+    ? " Assaf is a real estate photographer. For a price drop, lead with a genuine question about how they plan to market the new price — then offer to brainstorm or jump on a quick call. Don't pitch anything specific. Keep it conversational, like a colleague reaching out. Do NOT mention new photo shoots."
     : "";
 
   const prompt = `You write text messages from Assaf, a real estate photographer in Scottsdale AZ, to the agent whose listing just changed status. Assaf is friendly and direct — he texts like a colleague, not a marketer. No opener like "Hi [name]," unless it feels natural. No emojis. No self-promotion. One or two short sentences max. Never write a generic "just checking in" message — always acknowledge the specific event that happened.${priceHint}
