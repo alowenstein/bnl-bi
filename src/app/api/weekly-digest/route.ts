@@ -42,13 +42,15 @@ const APP_URL        = process.env.NEXT_PUBLIC_APP_URL ?? "https://bnl-bi.vercel
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 function isAuthorized(req: Request): boolean {
-  const cronSecret = process.env.CRON_SECRET ?? "";
-  // Vercel cron sends Authorization header; manual trigger uses ?secret= param
+  const cronSecret   = process.env.CRON_SECRET  ?? "";
+  const digestSecret = process.env.DIGEST_SECRET ?? "";
+  // Vercel cron sends Authorization: Bearer <CRON_SECRET>
+  // Manual trigger uses ?secret=<DIGEST_SECRET>
   const authHeader = req.headers.get("authorization");
   const urlSecret  = new URL(req.url).searchParams.get("secret");
   return (
-    authHeader === `Bearer ${cronSecret}` ||
-    (!!urlSecret && urlSecret === cronSecret)
+    (!!cronSecret   && authHeader === `Bearer ${cronSecret}`) ||
+    (!!digestSecret && urlSecret  === digestSecret)
   );
 }
 
