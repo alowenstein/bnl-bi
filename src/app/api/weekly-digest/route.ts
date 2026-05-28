@@ -143,6 +143,19 @@ const EVENT_LABELS: Record<DisplayStatus, string> = {
   for_sale:       "is still for sale",
 };
 
+function fallbackMessage(entry: ListingEntry): string {
+  const name   = entry.agentName.trim().split(" ")[0];
+  const street = streetName(entry.address);
+  switch (entry.displayStatus) {
+    case "sold":           return `Congrats on closing ${street}, ${name}! Let me know if you need shots for the next one.`;
+    case "pending":        return `${name}, congrats on getting ${street} under contract!`;
+    case "backup_offers":  return `${name}, congrats on ${street} going under contract!`;
+    case "price_change":   return `${name}, saw the price update on ${street} — might be worth swapping the hero photo on Zillow to give it a fresh look for buyers at the new price.`;
+    case "off_market":     return `${name}, hope everything's going well with ${street}. Let me know if you re-list.`;
+    default:               return `${name}, wanted to touch base about ${street}.`;
+  }
+}
+
 async function composeMessage(entry: ListingEntry): Promise<string> {
   const client     = new Anthropic();
   const firstName  = entry.agentName.trim().split(" ")[0];
@@ -324,12 +337,15 @@ export async function GET(req: Request) {
     return NextResponse.json({ sent: false, reason: "No noteworthy listings this week" });
   }
 
-  // 4. Compose text messages for each listing in parallel
-  const messageResults = await Promise.allSettled(allListings.map(composeMessage));
+  // 4. Compose text messages — limit to 3 concurrent to avoid Claude rate limits
+  const messageResults = await pLimit(
+    allListings.map((entry) => () => composeMessage(entry)),
+    3,
+  );
   const messages = messageResults.map((r, i) =>
     r.status === "fulfilled" && r.value
       ? r.value
-      : `Hey ${allListings[i].agentName.split(" ")[0]}, just checking in on ${streetName(allListings[i].address)}!`
+      : fallbackMessage(allListings[i])
   );
 
   // 5. Build signed approve token for listings that have a phone number

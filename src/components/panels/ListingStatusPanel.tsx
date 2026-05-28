@@ -102,7 +102,7 @@ function fallbackMessage(entry: ListingEntry): string {
     case "sold":           return `Congrats on closing ${street}, ${name}!`;
     case "pending":        return `${name}, congrats on getting ${street} under contract!`;
     case "backup_offers":  return `${name}, congrats on ${street} going under contract!`;
-    case "price_change":   return `Hey ${name}, saw ${street} just had a price adjustment — if you want fresh photos or updated marketing content to push the new price, I'm around!`;
+    case "price_change":   return `${name}, saw the price update on ${street} — might be worth swapping the hero photo on Zillow to give it a fresh look for buyers at the new price.`;
     case "off_market":     return `${name}, hope everything's going well with ${street}!`;
     default:               return `Hey ${name}, just checking in on ${street}.`;
   }
