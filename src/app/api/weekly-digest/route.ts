@@ -399,7 +399,7 @@ export async function GET(req: Request) {
 
   const html = buildEmailHtml(allListings, messages, approveUrl);
   await transporter.sendMail({
-    from:    `"BNL BI" <${GMAIL_USER}>`,
+    from:    `"Builds 'n Lenses Business Intelligence" <${GMAIL_USER}>`,
     to:      GMAIL_USER,
     subject: `📋 Weekly Digest — ${allListings.length} listing${allListings.length !== 1 ? "s" : ""} to follow up`,
     html,
