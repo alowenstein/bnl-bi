@@ -237,15 +237,17 @@ function buildEmailHtml(
   messages: string[],
   approveUrl: string,
 ): string {
-  // Build 2-column table layout (email-client-safe)
+  // Build 3-column table layout (email-client-safe)
   const rows: string[] = [];
-  for (let i = 0; i < listings.length; i += 2) {
-    const left  = buildCard(listings[i],   messages[i]);
-    const right = i + 1 < listings.length ? buildCard(listings[i + 1], messages[i + 1]) : "";
+  for (let i = 0; i < listings.length; i += 3) {
+    const c1 = buildCard(listings[i],     messages[i]);
+    const c2 = i + 1 < listings.length ? buildCard(listings[i + 1], messages[i + 1]) : "";
+    const c3 = i + 2 < listings.length ? buildCard(listings[i + 2], messages[i + 2]) : "";
     rows.push(`
       <tr>
-        <td width="50%" valign="top" style="padding:6px 6px 6px 0;">${left}</td>
-        <td width="50%" valign="top" style="padding:6px 0 6px 6px;">${right}</td>
+        <td width="33%" valign="top" style="padding:6px 4px 6px 0;">${c1}</td>
+        <td width="33%" valign="top" style="padding:6px 4px;">${c2}</td>
+        <td width="34%" valign="top" style="padding:6px 0 6px 4px;">${c3}</td>
       </tr>`);
   }
 
@@ -253,7 +255,7 @@ function buildEmailHtml(
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <div style="max-width:680px;margin:32px auto;padding:0 12px;">
+  <div style="max-width:780px;margin:32px auto;padding:0 12px;">
 
     <!-- Header -->
     <div style="background:#111;border-radius:12px 12px 0 0;padding:22px 28px;">
