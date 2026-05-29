@@ -137,7 +137,7 @@ export function buildApproveToken(jobs: SendJob[]): string {
 const EVENT_LABELS: Record<DisplayStatus, string> = {
   sold:           "sold / closed",
   pending:        "went pending / under contract",
-  backup_offers:  "is contingent / accepting backup offers",
+  backup_offers:  "went contingent",
   price_change:   "had a price reduction",
   off_market:     "went off market",
   for_sale:       "is still for sale",
@@ -166,7 +166,7 @@ async function composeMessage(entry: ListingEntry): Promise<string> {
   const statusHint: Partial<Record<DisplayStatus, string>> = {
     price_change:  " Lead with a genuine question about how they plan to market the new price — then offer to brainstorm or jump on a quick call. Don't pitch anything. Do NOT mention photos or photo shoots.",
     pending:       " Just acknowledge the milestone warmly. One sentence, nothing more. Do NOT offer photos, services, or anything — just a genuine congrats.",
-    backup_offers: " Just acknowledge it went contingent and wish them well. Keep it warm and brief. Do NOT offer photos, services, or 'backup marketing' — just a genuine acknowledgment.",
+    backup_offers: " Just say congrats and hope it closes smoothly. One warm sentence. Do NOT mention photos, backup offers, backup marketing, or any service. Never use the word 'backup' in the message.",
     sold:          " Congratulate on closing. Keep it brief. A light mention of being available for their next listing is fine, but do NOT make it salesy.",
     off_market:    " Keep it brief and warm. Express hope things work out. Do NOT offer services.",
   };
@@ -199,77 +199,88 @@ const BADGE_COLORS: Record<DisplayStatus, { bg: string; color: string; label: st
   for_sale:       { bg: "#f3f4f6", color: "#6b7280", label: "For Sale" },
 };
 
+function buildCard(entry: ListingEntry, message: string): string {
+  const badge      = BADGE_COLORS[entry.displayStatus];
+  const shotDate   = new Date(entry.shotDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const statusDate = entry.statusDate
+    ? new Date(entry.statusDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+  const priceRow = entry.displayStatus === "price_change" && entry.previousPrice && entry.currentPrice
+    ? `<p style="margin:4px 0;font-size:12px;color:#555;">$${entry.previousPrice.toLocaleString()} → <strong>$${entry.currentPrice.toLocaleString()}</strong></p>`
+    : entry.currentPrice
+      ? `<p style="margin:4px 0;font-size:12px;color:#555;">$${entry.currentPrice.toLocaleString()}</p>`
+      : "";
+
+  return `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;height:100%;box-sizing:border-box;">
+    <div style="margin-bottom:6px;">
+      <span style="background:${badge.bg};color:${badge.color};font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;">${badge.label}</span>
+      ${statusDate ? `<span style="font-size:11px;color:#9ca3af;margin-left:6px;">on ${statusDate}</span>` : ""}
+      <span style="font-size:11px;color:#d1d5db;margin-left:4px;">· shot ${shotDate}</span>
+    </div>
+    <p style="margin:0 0 2px;font-size:13px;font-weight:600;color:#111;">${entry.address}${entry.address2 ? ` ${entry.address2}` : ""}</p>
+    <p style="margin:0 0 3px;font-size:11px;color:#9ca3af;">${entry.city}, ${entry.state}${entry.mls ? ` · MLS# ${entry.mls}` : ""}</p>
+    ${priceRow}
+    <p style="margin:6px 0 0;font-size:12px;color:#555;"><strong>${entry.agentName}</strong>${entry.agentPhone ? `<br>${entry.agentPhone}` : ""}</p>
+    <div style="background:#f9fafb;border-left:3px solid #d1d5db;border-radius:4px;padding:8px 10px;margin-top:10px;">
+      <p style="margin:0;font-size:12px;color:#374151;line-height:1.5;font-style:italic;">"${message}"</p>
+    </div>
+    <div style="margin-top:10px;">
+      <a href="${entry.listingUrl}" style="font-size:11px;color:#6b7280;text-decoration:underline;">Zillow ↗</a>
+      &nbsp;&nbsp;&nbsp;
+      <a href="${entry.hdphUrl}" style="font-size:11px;color:#6b7280;text-decoration:underline;">HD Photo Hub ↗</a>
+    </div>
+  </div>`;
+}
+
 function buildEmailHtml(
   listings: ListingEntry[],
   messages: string[],
   approveUrl: string,
 ): string {
-  const listingRows = listings.map((entry, i) => {
-    const badge = BADGE_COLORS[entry.displayStatus];
-    const shotDate = new Date(entry.shotDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const statusDate = entry.statusDate
-      ? new Date(entry.statusDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-      : null;
-
-    const priceRow = entry.displayStatus === "price_change" && entry.previousPrice && entry.currentPrice
-      ? `<p style="margin:4px 0;font-size:13px;color:#555;">$${entry.previousPrice.toLocaleString()} → <strong>$${entry.currentPrice.toLocaleString()}</strong></p>`
-      : entry.currentPrice
-        ? `<p style="margin:4px 0;font-size:13px;color:#555;">$${entry.currentPrice.toLocaleString()}</p>`
-        : "";
-
-    return `
-      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <span style="background:${badge.bg};color:${badge.color};font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;">${badge.label}</span>
-          ${statusDate ? `<span style="font-size:12px;color:#9ca3af;">on ${statusDate}</span>` : ""}
-          <span style="font-size:12px;color:#d1d5db;">· shot ${shotDate}</span>
-        </div>
-        <p style="margin:0 0 4px;font-size:15px;font-weight:600;color:#111;">${entry.address}${entry.address2 ? ` ${entry.address2}` : ""}</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#9ca3af;">${entry.city}, ${entry.state}${entry.mls ? ` · MLS# ${entry.mls}` : ""}</p>
-        ${priceRow}
-        <p style="margin:8px 0 4px;font-size:13px;color:#555;">
-          <strong>${entry.agentName}</strong>${entry.agentPhone ? ` · ${entry.agentPhone}` : ""}
-        </p>
-        <div style="background:#f9fafb;border-left:3px solid #d1d5db;border-radius:4px;padding:10px 14px;margin-top:12px;">
-          <p style="margin:0;font-size:13px;color:#374151;line-height:1.5;font-style:italic;">"${messages[i]}"</p>
-        </div>
-        <div style="margin-top:10px;display:flex;gap:12px;">
-          <a href="${entry.listingUrl}" style="font-size:12px;color:#6b7280;text-decoration:underline;">Zillow ↗</a>
-          <a href="${entry.hdphUrl}" style="font-size:12px;color:#6b7280;text-decoration:underline;">HD Photo Hub ↗</a>
-        </div>
-      </div>`;
-  }).join("");
+  // Build 2-column table layout (email-client-safe)
+  const rows: string[] = [];
+  for (let i = 0; i < listings.length; i += 2) {
+    const left  = buildCard(listings[i],   messages[i]);
+    const right = i + 1 < listings.length ? buildCard(listings[i + 1], messages[i + 1]) : "";
+    rows.push(`
+      <tr>
+        <td width="50%" valign="top" style="padding:6px 6px 6px 0;">${left}</td>
+        <td width="50%" valign="top" style="padding:6px 0 6px 6px;">${right}</td>
+      </tr>`);
+  }
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <div style="max-width:600px;margin:32px auto;padding:0 16px;">
+  <div style="max-width:680px;margin:32px auto;padding:0 12px;">
 
     <!-- Header -->
-    <div style="background:#111;border-radius:12px 12px 0 0;padding:24px 28px;">
+    <div style="background:#111;border-radius:12px 12px 0 0;padding:22px 28px;">
       <p style="margin:0;font-size:12px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;">Builds 'n Lenses</p>
       <h1 style="margin:4px 0 0;font-size:22px;font-weight:700;color:#fff;">Weekly Listing Digest</h1>
     </div>
 
     <!-- Summary bar -->
-    <div style="background:#1f2937;padding:14px 28px;">
-      <p style="margin:0;font-size:14px;color:#d1d5db;">
+    <div style="background:#1f2937;padding:12px 28px;">
+      <p style="margin:0;font-size:13px;color:#d1d5db;">
         <strong style="color:#fff;">${listings.length} listing${listings.length !== 1 ? "s" : ""}</strong> need follow-up this week
       </p>
     </div>
 
     <!-- Body -->
-    <div style="background:#f9fafb;padding:24px 20px;">
-      ${listingRows}
+    <div style="background:#f9fafb;padding:20px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        ${rows.join("")}
+      </table>
 
       <!-- Approve all button -->
-      <div style="text-align:center;margin:28px 0 16px;">
+      <div style="text-align:center;margin:24px 0 14px;">
         <a href="${approveUrl}"
            style="display:inline-block;background:#16a34a;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">
           ✅ Approve All &amp; Send Texts
         </a>
-        <p style="margin:10px 0 0;font-size:12px;color:#9ca3af;">Sends all ${listings.length} text${listings.length !== 1 ? "s" : ""} to agents via OpenPhone</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#9ca3af;">Sends all ${listings.length} text${listings.length !== 1 ? "s" : ""} to agents via OpenPhone</p>
       </div>
 
       <!-- Dashboard link -->
@@ -282,7 +293,7 @@ function buildEmailHtml(
     </div>
 
     <!-- Footer -->
-    <div style="background:#f3f4f6;border-top:1px solid #e5e7eb;padding:16px 20px;border-radius:0 0 12px 12px;">
+    <div style="background:#f3f4f6;border-top:1px solid #e5e7eb;padding:14px 20px;border-radius:0 0 12px 12px;">
       <p style="margin:0;font-size:11px;color:#9ca3af;text-align:center;">
         BNL BI · Monday digest · Approve link expires in 7 days
       </p>

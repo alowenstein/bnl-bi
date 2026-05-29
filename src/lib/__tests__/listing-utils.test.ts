@@ -45,6 +45,44 @@ function makeHistory(entries: { date: string; event: string; price?: number }[])
 
 const HDPH_URL = "https://order.buildsnlenses.com/Sites/summary.asp?nSiteID=1234";
 
+// ── formatPhone ───────────────────────────────────────────────────────────────
+
+import { formatPhone } from "@/lib/listing-utils";
+
+describe("formatPhone", () => {
+  it("formats dot-separated number", () => {
+    expect(formatPhone("480.430.1013")).toBe("480.430.1013");
+  });
+
+  it("formats dash-separated number", () => {
+    expect(formatPhone("623-308-0422")).toBe("623.308.0422");
+  });
+
+  it("strips parentheses and spaces", () => {
+    expect(formatPhone("(541) 514-0247")).toBe("541.514.0247");
+  });
+
+  it("strips leading 1 country code", () => {
+    expect(formatPhone("1 (480) 702-5522")).toBe("480.702.5522");
+  });
+
+  it("formats 10-digit string with no separators", () => {
+    expect(formatPhone("4804323737")).toBe("480.432.3737");
+  });
+
+  it("strips non-digit characters like ? in phone", () => {
+    expect(formatPhone("(602)?330-3991")).toBe("602.330.3991");
+  });
+
+  it("returns null for null input", () => {
+    expect(formatPhone(null)).toBeNull();
+  });
+
+  it("returns null for undefined input", () => {
+    expect(formatPhone(undefined)).toBeNull();
+  });
+});
+
 // ── streetName ────────────────────────────────────────────────────────────────
 // Strips leading street number + single-letter cardinal direction + unit suffix.
 
@@ -253,7 +291,7 @@ describe("determineListing", () => {
     const entry  = determineListing(site, result, HDPH_URL)!;
     expect(entry.agentName).toBe("Bob Smith");
     expect(entry.agentEmail).toBe("bob@example.com");
-    expect(entry.agentPhone).toBe("6025550000");
+    expect(entry.agentPhone).toBe("602.555.0000");
   });
 
   it("handles null price gracefully", () => {

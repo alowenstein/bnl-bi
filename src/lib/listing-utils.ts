@@ -47,6 +47,20 @@ export function streetName(address: string): string {
     .trim();
 }
 
+// ── Phone formatting ──────────────────────────────────────────────────────────
+
+/**
+ * Normalizes a phone number to xxx.xxx.xxxx format.
+ * Strips country code if present, returns original string if it can't be parsed to 10 digits.
+ */
+export function formatPhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  const clean  = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (clean.length !== 10) return phone.trim() || null;
+  return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6)}`;
+}
+
 // ── Zillow status mapping ─────────────────────────────────────────────────────
 
 export function mapZillowStatus(
@@ -157,7 +171,7 @@ export function determineListing(
       mls:           site.mls    ?? null,
       agentName:     site.user.name,
       agentEmail:    site.user.email,
-      agentPhone:    site.user.phone?.trim() || null,
+      agentPhone:    formatPhone(site.user.phone),
       shotDate:      shootDate,
       displayStatus,
       statusDate:    priceChange?.statusDate ?? null,

@@ -23,7 +23,7 @@ interface ComposeRequest {
 const EVENT_LABELS: Record<DisplayStatus, string> = {
   sold:           "sold / closed",
   pending:        "went pending / under contract",
-  backup_offers:  "is contingent / accepting backup offers",
+  backup_offers:  "went contingent",
   price_change:   "had a price reduction",
   off_market:     "went off market",
   for_sale:       "is still for sale",
