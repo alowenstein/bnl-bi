@@ -41,7 +41,20 @@ export async function POST(req: Request) {
   if (!res.ok) {
     const err = await res.text();
     console.error("OpenPhone send error:", res.status, err);
-    return NextResponse.json({ error: err }, { status: res.status });
+
+    let friendly = `Send failed (HTTP ${res.status})`;
+    try {
+      const parsed = JSON.parse(err) as { title?: string; message?: string };
+      if (res.status === 402) {
+        friendly = "Send failed — OpenPhone account is out of credits. Add funds at quo.com.";
+      } else if (parsed.title || parsed.message) {
+        friendly = `Send failed — ${parsed.message ?? parsed.title}`;
+      }
+    } catch {
+      // err wasn't JSON — fall back to the generic message above
+    }
+
+    return NextResponse.json({ error: friendly }, { status: res.status });
   }
 
   const data = await res.json();

@@ -1,7 +1,7 @@
 /**
  * GET /api/listing-changes
  *
- * Fetches the current 90-day HDPH shoot window live from HDPhotoHub,
+ * Fetches the current 6-month HDPH shoot window live from HDPhotoHub,
  * looks up each property's current status on Zillow via RealtyAPI, and returns
  * ALL listings bucketed by DisplayStatus.
  *
@@ -31,7 +31,7 @@ const HDPH_BASE           = process.env.HDPH_BASE_URL ?? "https://order.buildsnl
 const HDPH_KEY            = process.env.HDPH_API_KEY  ?? "";
 const REALTYAPI_KEY       = process.env.REALTYAPI_KEY ?? "";
 const REALTYAPI_BASE      = "https://zillow.realtyapi.io";
-const WINDOW_DAYS         = 90;
+const WINDOW_DAYS         = 180;
 const CACHE_TTL_MS        = 60 * 60 * 1000; // 1 hour
 const REALTYAPI_CONCURRENCY = 10;            // max parallel RealtyAPI calls
 const REALTYAPI_TIMEOUT_MS  = 10_000;        // abort individual call after 10 s
@@ -164,7 +164,7 @@ export async function GET(req: Request) {
 
   const now = new Date().toISOString();
 
-  // 1. Fetch all HDPH sites; keep only delivered shoots within the 90-day window.
+  // 1. Fetch all HDPH sites; keep only delivered shoots within the 6-month window.
   //    "Has at least one non-hidden still photo" = media was delivered = shoot happened.
   const allSites = await fetchHdphSites();
   const sites    = allSites.filter(

@@ -4,7 +4,7 @@
  * Vercel Cron: runs every Monday at 8:00 AM Arizona time (15:00 UTC).
  * Manually trigger: GET /api/weekly-digest?secret=<CRON_SECRET>
  *
- * 1. Fetches the 90-day HDPH shoot window + RealtyAPI status
+ * 1. Fetches the 6-month HDPH shoot window + RealtyAPI status
  * 2. Keeps noteworthy listings (sold, pending, backup offers, price change, off market)
  * 3. Composes a text message for each via Claude haiku
  * 4. Emails Assaf a digest with one "Approve All & Send Texts" button
@@ -27,7 +27,7 @@ const HDPH_BASE      = process.env.HDPH_BASE_URL  ?? "https://order.buildsnlense
 const HDPH_KEY       = process.env.HDPH_API_KEY   ?? "";
 const REALTYAPI_KEY  = process.env.REALTYAPI_KEY  ?? "";
 const REALTYAPI_BASE = "https://zillow.realtyapi.io";
-const WINDOW_DAYS    = 90;
+const WINDOW_DAYS    = 180;
 const CONCURRENCY    = 10;
 const TIMEOUT_MS     = 10_000;
 const BROWSER_UA     =
@@ -324,7 +324,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Missing DIGEST_SECRET" }, { status: 503 });
   }
 
-  // 1. Fetch HDPH sites and filter to delivered shoots in the 90-day window
+  // 1. Fetch HDPH sites and filter to delivered shoots in the 6-month window
   const allSites = await fetchHdphSites();
   const sites    = allSites.filter(
     (s) => withinWindow(s.created, WINDOW_DAYS) &&

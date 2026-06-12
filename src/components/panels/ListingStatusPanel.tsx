@@ -156,7 +156,8 @@ function SendButton({
       }
     } catch (err) {
       console.error("Send failed:", err);
-      setErrorMsg("Send failed — check phone number and try again.");
+      const msg = err instanceof Error ? err.message : "";
+      setErrorMsg(msg || "Send failed — check phone number and try again.");
       setState("error");
     }
   }
