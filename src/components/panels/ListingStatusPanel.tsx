@@ -434,7 +434,7 @@ export function ListingStatusPanel() {
   if (isLoading) return (
     <div className="flex flex-col items-center gap-3 py-12 text-gray-400">
       <LoadingSpinner size="lg" />
-      <p className="text-sm">Checking 90-day listings via Zillow…</p>
+      <p className="text-sm">Checking 180-day listings via Zillow…</p>
     </div>
   );
   if (error) return <ErrorBanner message={error.message} />;
@@ -546,8 +546,8 @@ export function ListingStatusPanel() {
         <div className="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm">
           <p className="text-sm text-gray-400 italic">
             {view === "noteworthy"
-              ? "No listings in a noteworthy state in the last 90 days. All good!"
-              : "No for-sale listings found in the last 90 days."}
+              ? "No listings in a noteworthy state in the last 180 days. All good!"
+              : "No for-sale listings found in the last 180 days."}
           </p>
         </div>
       ) : visible.length === 0 ? (
