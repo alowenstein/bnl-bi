@@ -9,7 +9,7 @@ import type { DisplayStatus, ListingEntry } from "@/types/listing-status";
 
 export type ZillowStatus =
   | "For Sale" | "Pending" | "Under Contract"
-  | "Accepting Backup Offers" | "Sold" | "Off Market" | "Unknown";
+  | "Accepting Backup Offers" | "Sold" | "Off Market" | "For Rent" | "Unknown";
 
 export interface PriceHistoryEntry {
   date: string;
@@ -77,6 +77,7 @@ export function mapZillowStatus(
     case "SOLD":
     case "RECENTLY_SOLD": return "Sold";
     case "OTHER":         return "Off Market";
+    case "FOR_RENT":      return "For Rent";
     default:              return "Unknown";
   }
 }

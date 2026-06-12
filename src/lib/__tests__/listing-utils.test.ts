@@ -165,6 +165,10 @@ describe("mapZillowStatus", () => {
   it("contingentListingType takes priority over isPending", () => {
     expect(mapZillowStatus("FOR_SALE", { isPending: true }, "CONTINGENT")).toBe("Accepting Backup Offers");
   });
+
+  it("maps FOR_RENT → For Rent", () => {
+    expect(mapZillowStatus("FOR_RENT")).toBe("For Rent");
+  });
 });
 
 // ── getStatusDate ─────────────────────────────────────────────────────────────
@@ -270,6 +274,12 @@ describe("determineListing", () => {
     const result = makeResult({ status: "Off Market", statusDate: "2026-04-01" });
     const entry  = determineListing(site, result, HDPH_URL);
     expect(entry!.displayStatus).toBe("off_market");
+  });
+
+  it("excludes For Rent listings entirely", () => {
+    const site   = makeSite({ created: "3/1/2026 10:00:00 AM" });
+    const result = makeResult({ status: "For Rent", statusDate: "2026-04-01" });
+    expect(determineListing(site, result, HDPH_URL)).toBeNull();
   });
 
   it("includes listing when statusDate is null (unknown date, not excluded)", () => {
