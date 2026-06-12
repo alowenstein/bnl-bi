@@ -15,6 +15,7 @@ export interface PriceHistoryEntry {
   date: string;
   event: string;
   price?: number;
+  postingIsRental?: boolean;
 }
 
 export interface RealtyApiResult {

@@ -110,7 +110,8 @@ async function fetchRealtyApiStatus(site: HdphSite): Promise<RealtyApiResult | n
     const pd = json.propertyDetails;
     if (!pd?.homeStatus) return null;
     const status     = mapZillowStatus(pd.homeStatus as string, pd.listingSubType as Record<string,boolean>|null, pd.contingentListingType as string|null);
-    const rawHistory = (pd.priceHistory as PriceHistoryEntry[] | null) ?? [];
+    const rawHistory = ((pd.priceHistory as PriceHistoryEntry[] | null) ?? [])
+      .filter((h) => !h.postingIsRental);
     const price      = (pd.price as number | null) ?? null;
     const listingUrl = pd.hdpUrl ? `https://www.zillow.com${pd.hdpUrl as string}` : `https://www.zillow.com/homes/${encodeURIComponent(addr.replace(/\s+/g,"-"))}_rb/`;
     const statusDate = getStatusDate(rawHistory, status);
