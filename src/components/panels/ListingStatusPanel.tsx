@@ -32,7 +32,10 @@ const BADGE: Record<DisplayStatus, string> = {
 
 const LS_DISMISSED = "listing-dismissed";
 const LS_EDITS     = "bnl-message-edits";
+const LS_SENT      = "bnl-sent-messages";
 const MAX_EDITS_PER_TYPE = 5;
+
+interface SentRecord { status: DisplayStatus; sentAt: string; }
 
 function useDismissed() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -64,6 +67,32 @@ function useDismissed() {
   }, []);
 
   return { dismissed, dismiss, restoreAll, hydrated };
+}
+
+// ── Sent message history (localStorage) ──────────────────────────────────────
+
+function useSentHistory() {
+  const [history, setHistory] = useState<Record<string, SentRecord[]>>({});
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_SENT);
+      if (raw) setHistory(JSON.parse(raw) as Record<string, SentRecord[]>);
+    } catch { /* ignore */ }
+  }, []);
+
+  const recordSent = useCallback((sid: number, status: DisplayStatus) => {
+    setHistory((prev) => {
+      const key      = String(sid);
+      const existing = prev[key] ?? [];
+      if (existing.some((r) => r.status === status)) return prev; // already recorded
+      const next = { ...prev, [key]: [...existing, { status, sentAt: new Date().toISOString() }] };
+      try { localStorage.setItem(LS_SENT, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  return { history, recordSent };
 }
 
 // ── Message edit examples (localStorage) ──────────────────────────────────────
@@ -122,11 +151,13 @@ function SendButton({
   message,
   originalMessage,
   onSent,
+  onRecordSent,
 }: {
   entry: ListingEntry;
   message: string;
   originalMessage: string;
   onSent: () => void;
+  onRecordSent: (sid: number, status: DisplayStatus) => void;
 }) {
   const [state, setState] = useState<SendState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -149,6 +180,7 @@ function SendButton({
         throw new Error(err.error ?? `HTTP ${res.status}`);
       }
       setState("sent");
+      onRecordSent(entry.sid, entry.displayStatus);
 
       // If the user edited the message, save it as a training example
       if (message.trim() !== originalMessage.trim()) {
@@ -184,10 +216,14 @@ function ListingCard({
   entry,
   onDismiss,
   onEditSaved,
+  sentRecords,
+  onRecordSent,
 }: {
   entry: ListingEntry;
   onDismiss: (id: string) => void;
   onEditSaved: () => void;
+  sentRecords: SentRecord[];
+  onRecordSent: (sid: number, status: DisplayStatus) => void;
 }) {
   const isNoteworthy = entry.displayStatus !== "for_sale";
 
@@ -317,6 +353,18 @@ function ListingCard({
           {entry.agentPhone && <span className="ml-1 text-gray-400">· {entry.agentPhone}</span>}
         </p>
 
+        {/* Sent message history */}
+        {sentRecords.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <span className="text-xs text-gray-300">Sent:</span>
+            {sentRecords.map((r) => (
+              <span key={r.status} className="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                ✓ {LABELS[r.status]}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Links + message toggle */}
         <div className="mt-2 flex items-center gap-3 flex-wrap">
           <a
@@ -388,6 +436,7 @@ function ListingCard({
                   message={message}
                   originalMessage={originalMsg}
                   onSent={onEditSaved}
+                  onRecordSent={onRecordSent}
                 />
               </div>
             </div>
@@ -414,6 +463,7 @@ const FILTER_CHIPS: { status: DisplayStatus; label: string; active: string; inac
 export function ListingStatusPanel() {
   const { listings, isLoading, error, refresh, fetchedAt, cached } = useListingChanges();
   const { dismissed, dismiss, restoreAll, hydrated } = useDismissed();
+  const { history: sentHistory, recordSent } = useSentHistory();
   const [editCount, setEditCount]       = useState(0);
   const [refreshing, setRefreshing]     = useState(false);
   const [view, setView]                 = useState<View>("noteworthy");
@@ -577,6 +627,8 @@ export function ListingStatusPanel() {
               entry={entry}
               onDismiss={dismiss}
               onEditSaved={refreshEditCount}
+              sentRecords={sentHistory[String(entry.sid)] ?? []}
+              onRecordSent={recordSent}
             />
           ))}
         </div>
