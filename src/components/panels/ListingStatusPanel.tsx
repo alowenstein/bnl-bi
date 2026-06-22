@@ -35,14 +35,19 @@ const LS_EDITS     = "bnl-message-edits";
 const MAX_EDITS_PER_TYPE = 5;
 
 function useDismissed() {
-  // Lazy initializer reads localStorage synchronously on first render so
-  // dismissed IDs are known before SWR data arrives — no flash of dismissed cards.
-  const [dismissed, setDismissed] = useState<Set<string>>(() => {
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [hydrated, setHydrated]   = useState(false);
+
+  // Read localStorage only on the client after mount — the lazy useState
+  // initializer runs during SSR where localStorage is unavailable, so dismissed
+  // IDs would silently reset on every page reload. useEffect is client-only.
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_DISMISSED);
-      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
-    } catch { return new Set(); }
-  });
+      if (raw) setDismissed(new Set(JSON.parse(raw) as string[]));
+    } catch { /* ignore */ }
+    setHydrated(true);
+  }, []);
 
   const dismiss = useCallback((id: string) => {
     setDismissed((prev) => {
@@ -58,7 +63,7 @@ function useDismissed() {
     try { localStorage.removeItem(LS_DISMISSED); } catch { /* ignore */ }
   }, []);
 
-  return { dismissed, dismiss, restoreAll };
+  return { dismissed, dismiss, restoreAll, hydrated };
 }
 
 // ── Message edit examples (localStorage) ──────────────────────────────────────
@@ -401,7 +406,7 @@ const FILTER_CHIPS: { status: DisplayStatus; label: string; active: string; inac
 
 export function ListingStatusPanel() {
   const { listings, isLoading, error, refresh, fetchedAt, cached } = useListingChanges();
-  const { dismissed, dismiss, restoreAll } = useDismissed();
+  const { dismissed, dismiss, restoreAll, hydrated } = useDismissed();
   const [editCount, setEditCount]       = useState(0);
   const [refreshing, setRefreshing]     = useState(false);
   const [view, setView]                 = useState<View>("noteworthy");
@@ -431,7 +436,7 @@ export function ListingStatusPanel() {
       })()
     : null;
 
-  if (isLoading) return (
+  if (isLoading || !hydrated) return (
     <div className="flex flex-col items-center gap-3 py-12 text-gray-400">
       <LoadingSpinner size="lg" />
       <p className="text-sm">Checking 180-day listings via Zillow…</p>

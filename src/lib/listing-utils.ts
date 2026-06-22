@@ -114,7 +114,6 @@ export function getFirstPhotoUrl(site: HdphSite): string | null {
 /**
  * Searches priceHistory (newest-first) for a "price change" event on or after
  * the shoot date. Returns the event date + the older price entry.
- * NOTE: Currently disabled in determineListing — reserved for future use.
  */
 export function detectPriceChange(
   priceHistory: PriceHistoryEntry[],
@@ -201,7 +200,7 @@ export function determineListing(
     mls:           site.mls    ?? null,
     agentName:     site.user.name,
     agentEmail:    site.user.email,
-    agentPhone:    site.user.phone?.trim() || null,
+    agentPhone:    formatPhone(site.user.phone),
     shotDate:      shootDate,
     displayStatus,
     statusDate,
