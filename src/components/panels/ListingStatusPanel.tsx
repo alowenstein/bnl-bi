@@ -292,14 +292,21 @@ function ListingCard({
 
         {/* Price info */}
         {isPriceChange ? (
-          <p className="text-xs text-gray-500 mb-1">
-            {fmt(entry.previousPrice)} → <strong>{fmt(entry.currentPrice)}</strong>
+          <div className="mb-1">
+            <p className="text-xs text-gray-500">
+              {fmt(entry.originalListingPrice ?? entry.previousPrice)} → <strong>{fmt(entry.currentPrice)}</strong>
+            </p>
             {priceDelta !== null && (
-              <span className={`ml-1 font-semibold ${priceDelta < 0 ? "text-blue-600" : "text-red-600"}`}>
-                ({priceDelta < 0 ? "▼" : "▲"} ${Math.abs(priceDelta).toLocaleString()})
-              </span>
+              <p className="text-xs font-semibold text-red-500">
+                ↓ ${Math.abs(priceDelta).toLocaleString()}
+                {entry.priceDropCount > 0 && (
+                  <span className="font-normal text-gray-400 ml-1">
+                    ({entry.priceDropCount} price {entry.priceDropCount === 1 ? "change" : "changes"})
+                  </span>
+                )}
+              </p>
             )}
-          </p>
+          </div>
         ) : entry.currentPrice !== null ? (
           <p className="text-xs text-gray-500 mb-1">{fmt(entry.currentPrice)}</p>
         ) : null}

@@ -84,7 +84,9 @@ export interface ListingEntry {
   displayStatus: DisplayStatus;
   statusDate: string | null;
   currentPrice: number | null;
-  previousPrice: number | null;   // price_change only
+  previousPrice: number | null;        // price before the most recent price change
+  originalListingPrice: number | null; // price when first listed on MLS
+  priceDropCount: number;              // total price changes since original listing
   listingUrl: string;
   hdphUrl: string;
   photoUrl: string | null;

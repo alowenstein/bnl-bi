@@ -109,7 +109,27 @@ export function getFirstPhotoUrl(site: HdphSite): string | null {
   )?.url ?? null;
 }
 
-// ── Price change detection ────────────────────────────────────────────────────
+// ── Price history analysis ────────────────────────────────────────────────────
+
+/**
+ * From a non-rental priceHistory (newest-first), extracts:
+ * - originalListingPrice: price at the most recent "Listed for sale" event
+ * - priceDropCount: number of "Price change" events since that listing event
+ */
+export function analyzePriceHistory(priceHistory: PriceHistoryEntry[]): {
+  originalListingPrice: number | null;
+  priceDropCount: number;
+} {
+  const listingIdx = priceHistory.findIndex(
+    (h) => h.event.toLowerCase().includes("listed for sale")
+  );
+  const window     = listingIdx === -1 ? priceHistory : priceHistory.slice(0, listingIdx);
+  const priceDropCount        = window.filter((h) => h.event.toLowerCase().includes("price change")).length;
+  const originalListingPrice  = listingIdx !== -1 ? (priceHistory[listingIdx]?.price ?? null) : null;
+  return { originalListingPrice, priceDropCount };
+}
+
+
 
 /**
  * Searches priceHistory (newest-first) for a "price change" event on or after
@@ -158,6 +178,8 @@ export function determineListing(
   const shootMs   = new Date(shootDate).getTime();
   const photoUrl  = getFirstPhotoUrl(site) ?? zillowPhoto;
 
+  const { originalListingPrice, priceDropCount } = analyzePriceHistory(result.priceHistory);
+
   // For Sale or Unknown — check for a price change since the shoot date
   if (status === "For Sale" || status === "Unknown") {
     const priceChange   = detectPriceChange(result.priceHistory, shootDate);
@@ -178,6 +200,8 @@ export function determineListing(
       statusDate:    priceChange?.statusDate ?? null,
       currentPrice:  price,
       previousPrice: priceChange?.previousPrice ?? null,
+      originalListingPrice,
+      priceDropCount,
       listingUrl,
       hdphUrl,
       photoUrl,
@@ -206,6 +230,8 @@ export function determineListing(
     statusDate,
     currentPrice:  price,
     previousPrice: null,
+    originalListingPrice,
+    priceDropCount,
     listingUrl,
     hdphUrl,
     photoUrl,

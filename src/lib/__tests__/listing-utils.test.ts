@@ -4,6 +4,7 @@ import {
   mapZillowStatus,
   getStatusDate,
   determineListing,
+  analyzePriceHistory,
 } from "@/lib/listing-utils";
 import type { HdphSite, RealtyApiResult, PriceHistoryEntry } from "@/lib/listing-utils";
 
@@ -325,5 +326,55 @@ describe("determineListing", () => {
     const result = makeResult({ photoUrl: "https://zillow.example.com/photo.jpg" });
     const entry  = determineListing(site, result, HDPH_URL)!;
     expect(entry.photoUrl).toBe("https://zillow.example.com/photo.jpg");
+  });
+});
+
+// ── analyzePriceHistory ───────────────────────────────────────────────────────
+
+describe("analyzePriceHistory", () => {
+  it("returns nulls and 0 for empty history", () => {
+    const r = analyzePriceHistory([]);
+    expect(r.originalListingPrice).toBeNull();
+    expect(r.priceDropCount).toBe(0);
+  });
+
+  it("finds original listing price from 'Listed for sale' event", () => {
+    const history = makeHistory([
+      { date: "2026-03-10", event: "Price change", price: 480000 },
+      { date: "2026-02-01", event: "Listed for sale", price: 500000 },
+    ]);
+    const r = analyzePriceHistory(history);
+    expect(r.originalListingPrice).toBe(500000);
+  });
+
+  it("counts price changes since listing", () => {
+    const history = makeHistory([
+      { date: "2026-04-01", event: "Price change", price: 460000 },
+      { date: "2026-03-10", event: "Price change", price: 480000 },
+      { date: "2026-02-01", event: "Listed for sale", price: 500000 },
+    ]);
+    const r = analyzePriceHistory(history);
+    expect(r.priceDropCount).toBe(2);
+    expect(r.originalListingPrice).toBe(500000);
+  });
+
+  it("returns 0 drops and null original when no 'Listed for sale' event", () => {
+    const history = makeHistory([
+      { date: "2026-04-01", event: "Sold", price: 460000 },
+    ]);
+    const r = analyzePriceHistory(history);
+    expect(r.originalListingPrice).toBeNull();
+    expect(r.priceDropCount).toBe(0);
+  });
+
+  it("does not count price changes after the listing event", () => {
+    const history = makeHistory([
+      { date: "2026-03-10", event: "Price change", price: 480000 },
+      { date: "2026-02-01", event: "Listed for sale", price: 500000 },
+      { date: "2025-10-01", event: "Price change", price: 520000 }, // old, before re-list
+    ]);
+    const r = analyzePriceHistory(history);
+    expect(r.priceDropCount).toBe(1);
+    expect(r.originalListingPrice).toBe(500000);
   });
 });

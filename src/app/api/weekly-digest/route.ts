@@ -206,11 +206,19 @@ function buildCard(entry: ListingEntry, message: string): string {
   const statusDate = entry.statusDate
     ? new Date(entry.statusDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : null;
-  const priceRow = entry.displayStatus === "price_change" && entry.previousPrice && entry.currentPrice
-    ? `<p style="margin:4px 0;font-size:12px;color:#555;">$${entry.previousPrice.toLocaleString()} → <strong>$${entry.currentPrice.toLocaleString()}</strong></p>`
-    : entry.currentPrice
-      ? `<p style="margin:4px 0;font-size:12px;color:#555;">$${entry.currentPrice.toLocaleString()}</p>`
+  let priceRow = "";
+  if (entry.displayStatus === "price_change" && entry.currentPrice) {
+    const origPrice = entry.originalListingPrice ?? entry.previousPrice;
+    const delta     = entry.previousPrice !== null ? entry.currentPrice - entry.previousPrice : null;
+    const dropLine  = delta !== null
+      ? `<span style="color:#ef4444;font-weight:600;">↓ $${Math.abs(delta).toLocaleString()}</span>`
+        + (entry.priceDropCount > 0 ? ` <span style="color:#9ca3af;font-size:11px;">(${entry.priceDropCount} price ${entry.priceDropCount === 1 ? "change" : "changes"})</span>` : "")
       : "";
+    priceRow = `<p style="margin:4px 0;font-size:12px;color:#555;">$${origPrice ? origPrice.toLocaleString() + " →" : ""} <strong>$${entry.currentPrice.toLocaleString()}</strong></p>`
+             + (dropLine ? `<p style="margin:2px 0;font-size:12px;">${dropLine}</p>` : "");
+  } else if (entry.currentPrice) {
+    priceRow = `<p style="margin:4px 0;font-size:12px;color:#555;">$${entry.currentPrice.toLocaleString()}</p>`;
+  }
 
   return `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px;height:100%;box-sizing:border-box;">
     <div style="margin-bottom:6px;">
