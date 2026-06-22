@@ -233,6 +233,45 @@ function buildCard(entry: ListingEntry, message: string): string {
   </div>`;
 }
 
+function emailShell(summaryBar: string, body: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:780px;margin:32px auto;padding:0 12px;">
+    <div style="background:#111;border-radius:12px 12px 0 0;padding:22px 28px;">
+      <p style="margin:0;font-size:12px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;">Builds 'n Lenses</p>
+      <h1 style="margin:4px 0 0;font-size:22px;font-weight:700;color:#fff;">Weekly Listing Digest</h1>
+    </div>
+    <div style="background:#1f2937;padding:12px 28px;">${summaryBar}</div>
+    <div style="background:#f9fafb;padding:20px 16px;">${body}</div>
+    <div style="background:#f3f4f6;border-top:1px solid #e5e7eb;padding:14px 20px;border-radius:0 0 12px 12px;">
+      <p style="margin:0;font-size:11px;color:#9ca3af;text-align:center;">
+        BNL BI · Monday digest · Approve link expires in 7 days
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function buildQuietHtml(): string {
+  return emailShell(
+    `<p style="margin:0;font-size:13px;color:#d1d5db;">All quiet this week — no new status changes.</p>`,
+    `<div style="text-align:center;padding:32px 0;">
+      <p style="font-size:32px;margin:0;">✅</p>
+      <p style="margin:12px 0 4px;font-size:16px;font-weight:600;color:#111;">Nothing to follow up on</p>
+      <p style="margin:0;font-size:13px;color:#6b7280;">No listings went pending, sold, off market, or had a price change in the past week.</p>
+      <div style="margin-top:24px;">
+        <a href="${APP_URL}"
+           style="display:inline-block;background:#fff;border:1px solid #d1d5db;color:#374151;font-size:14px;font-weight:500;padding:10px 24px;border-radius:8px;text-decoration:none;">
+          Open Dashboard →
+        </a>
+      </div>
+    </div>`,
+  );
+}
+
 function buildEmailHtml(
   listings: ListingEntry[],
   messages: string[],
@@ -252,32 +291,13 @@ function buildEmailHtml(
       </tr>`);
   }
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <div style="max-width:780px;margin:32px auto;padding:0 12px;">
-
-    <!-- Header -->
-    <div style="background:#111;border-radius:12px 12px 0 0;padding:22px 28px;">
-      <p style="margin:0;font-size:12px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;">Builds 'n Lenses</p>
-      <h1 style="margin:4px 0 0;font-size:22px;font-weight:700;color:#fff;">Weekly Listing Digest</h1>
-    </div>
-
-    <!-- Summary bar -->
-    <div style="background:#1f2937;padding:12px 28px;">
-      <p style="margin:0;font-size:13px;color:#d1d5db;">
-        <strong style="color:#fff;">${listings.length} listing${listings.length !== 1 ? "s" : ""}</strong> need follow-up this week
-      </p>
-    </div>
-
-    <!-- Body -->
-    <div style="background:#f9fafb;padding:20px 16px;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+  return emailShell(
+    `<p style="margin:0;font-size:13px;color:#d1d5db;">
+       <strong style="color:#fff;">${listings.length} listing${listings.length !== 1 ? "s" : ""}</strong> need follow-up this week
+     </p>`,
+    `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
         ${rows.join("")}
       </table>
-
-      <!-- Approve all button -->
       <div style="text-align:center;margin:24px 0 14px;">
         <a href="${approveUrl}"
            style="display:inline-block;background:#16a34a;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">
@@ -285,25 +305,13 @@ function buildEmailHtml(
         </a>
         <p style="margin:8px 0 0;font-size:12px;color:#9ca3af;">Sends all ${listings.length} text${listings.length !== 1 ? "s" : ""} to agents via OpenPhone</p>
       </div>
-
-      <!-- Dashboard link -->
       <div style="text-align:center;margin-top:8px;">
         <a href="${APP_URL}"
            style="display:inline-block;background:#fff;border:1px solid #d1d5db;color:#374151;font-size:14px;font-weight:500;padding:10px 24px;border-radius:8px;text-decoration:none;">
           Open Dashboard →
         </a>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div style="background:#f3f4f6;border-top:1px solid #e5e7eb;padding:14px 20px;border-radius:0 0 12px 12px;">
-      <p style="margin:0;font-size:11px;color:#9ca3af;text-align:center;">
-        BNL BI · Monday digest · Approve link expires in 7 days
-      </p>
-    </div>
-  </div>
-</body>
-</html>`;
+      </div>`,
+  );
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -357,7 +365,17 @@ export async function GET(req: Request) {
   allListings.sort((a, b) => new Date(a.shotDate).getTime() - new Date(b.shotDate).getTime());
 
   if (allListings.length === 0) {
-    return NextResponse.json({ sent: false, reason: "No noteworthy listings this week" });
+    if (dryRun) return NextResponse.json({ dryRun: true, listingCount: 0, sendableCount: 0, listings: [] });
+    if (!dryRun && GMAIL_USER && GMAIL_PASS) {
+      const transporter = nodemailer.createTransport({ service: "gmail", auth: { user: GMAIL_USER, pass: GMAIL_PASS } });
+      await transporter.sendMail({
+        from:    `"Builds 'n Lenses Business Intelligence" <${GMAIL_USER}>`,
+        to:      GMAIL_USER,
+        subject: `✅ Weekly Digest — all quiet this week`,
+        html:    buildQuietHtml(),
+      });
+    }
+    return NextResponse.json({ sent: true, listingCount: 0, sendableCount: 0 });
   }
 
   // 4. Compose text messages — limit to 3 concurrent to avoid Claude rate limits
