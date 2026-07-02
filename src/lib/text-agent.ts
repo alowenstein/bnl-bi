@@ -22,7 +22,7 @@ Sign off naturally without a formal signature.`;
  */
 export async function generateSMSReply(incomingText: string): Promise<string> {
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model: "claude-haiku-4-5",
     max_tokens: 300,
     system: BNL_SYSTEM_PROMPT,
     messages: [
@@ -42,7 +42,7 @@ export async function generateSMSReply(incomingText: string): Promise<string> {
  */
 export async function generateMissedCallText(): Promise<string> {
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model: "claude-haiku-4-5",
     max_tokens: 200,
     system: BNL_SYSTEM_PROMPT,
     messages: [
