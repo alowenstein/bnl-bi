@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import type { HdphSite } from "@/types/hdph";
 import {
   computeBundles,
@@ -76,16 +76,7 @@ export function useInsights(sites: HdphSite[]) {
     }
   }, []);
 
-  // Auto-load once sites are available
-  useEffect(() => {
-    if (sites.length > 0 && loadedForRef.current === 0) {
-      loadedForRef.current = sites.length;
-      load(sites);
-    }
-  }, [sites, load]);
-
   const refresh = useCallback(() => {
-    loadedForRef.current = 0; // reset so next effect triggers
     load(sites);
   }, [sites, load]);
 
