@@ -41,13 +41,13 @@ ${seasonality.map((s) => `  ${s.month}: ${s.index}`).join(", ")}
       async start(controller) {
         try {
           const anthropicStream = anthropic.messages.stream({
-            model: "claude-opus-4-6",
-            max_tokens: 2000,
+            model: "claude-sonnet-4-6",
+            max_tokens: 1024,
             system: "You are a sharp business consultant specializing in real estate photography companies. Provide concise, actionable insights. Use bullet points. Be specific with numbers. Focus on what the business owner can actually do to grow revenue.",
             messages: [
               {
                 role: "user",
-                content: dataContext + "\n\nBased on this data, provide a structured analysis with:\n\n1. **Top Performing Bundles** — What's selling best and why this makes sense\n2. **Pricing Opportunities** — Which services/bundles could command higher prices (seasonal or market-based)\n3. **Underutilized Services** — What's undersold that could grow revenue\n4. **Bundle Recommendations** — 2-3 specific new bundles to test\n5. **Seasonal Strategy** — When to push which services based on the demand patterns\n\nBe specific, reference the actual numbers, and keep it under 500 words total.",
+                content: dataContext + "\n\nBased on this data, provide a structured analysis with:\n\n1. **Top Performing Bundles** — What's selling best and why this makes sense\n2. **Pricing Opportunities** — Which services/bundles could command higher prices (seasonal or market-based)\n3. **Underutilized Services** — What's undersold that could grow revenue\n4. **Bundle Recommendations** — 2-3 specific new bundles to test\n5. **Seasonal Strategy** — When to push which services based on the demand patterns\n\nBe specific, reference the actual numbers, and keep it under 300 words total.",
               },
             ],
           });
