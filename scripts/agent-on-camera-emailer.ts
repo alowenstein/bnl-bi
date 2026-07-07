@@ -195,7 +195,7 @@ RECOMMENDATION: [One sentence — which option and why]
 Write all 3 options now using the actual property data above. Use real details — no placeholder brackets.`;
 
   const msg = await client.messages.create({
-    model: "claude-opus-4-6",
+    model: "claude-sonnet-4-6",
     max_tokens: 1500,
     messages: [{ role: "user", content: prompt }],
   });
