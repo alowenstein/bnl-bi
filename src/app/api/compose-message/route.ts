@@ -10,6 +10,8 @@ export interface MessageEdit {
   original: string;
   edited: string;
   savedAt: string;
+  agentFirstName?: string;  // stored so examples can be normalized to [NAME]/[STREET]
+  street?: string;
 }
 
 interface ComposeRequest {
@@ -37,11 +39,27 @@ export async function POST(req: Request) {
   const firstName = agentName.trim().split(" ")[0];
   const street    = streetName(address);
 
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   const examplesBlock = examples.length > 0
-    ? "\nHere are real messages Assaf sent and then improved. Mirror this style exactly:\n\n" +
+    ? "\nHere are real messages Assaf sent and then improved. They show the STYLE and STRUCTURE to use — substitute the current agent name and street for [NAME] and [STREET]:\n\n" +
       examples
         .slice(-5)
-        .map((e, i) => `Example ${i + 1}:\nDraft: ${e.original}\nSent: ${e.edited}`)
+        .map((e, i) => {
+          let orig = e.original;
+          let edit = e.edited;
+          if (e.agentFirstName) {
+            const re = new RegExp(escapeRegex(e.agentFirstName), "gi");
+            orig = orig.replace(re, "[NAME]");
+            edit = edit.replace(re, "[NAME]");
+          }
+          if (e.street) {
+            const re = new RegExp(escapeRegex(e.street), "gi");
+            orig = orig.replace(re, "[STREET]");
+            edit = edit.replace(re, "[STREET]");
+          }
+          return `Example ${i + 1}:\nDraft: ${orig}\nSent: ${edit}`;
+        })
         .join("\n\n") +
       "\n"
     : "";

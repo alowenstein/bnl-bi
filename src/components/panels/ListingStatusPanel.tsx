@@ -152,12 +152,14 @@ function SendButton({
   originalMessage,
   onSent,
   onRecordSent,
+  onDismiss,
 }: {
   entry: ListingEntry;
   message: string;
   originalMessage: string;
   onSent: () => void;
   onRecordSent: (sid: number, status: DisplayStatus) => void;
+  onDismiss: (id: string) => void;
 }) {
   const [state, setState] = useState<SendState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -182,12 +184,18 @@ function SendButton({
       setState("sent");
       onRecordSent(entry.sid, entry.displayStatus);
 
+      if (entry.displayStatus === "sold") {
+        onDismiss(entry.id);
+      }
+
       // If the user edited the message, save it as a training example
       if (message.trim() !== originalMessage.trim()) {
         saveEdit({
-          changeType: entry.displayStatus,
-          original:   originalMessage,
-          edited:     message,
+          changeType:     entry.displayStatus,
+          original:       originalMessage,
+          edited:         message,
+          agentFirstName: entry.agentName.trim().split(" ")[0],
+          street:         streetName(entry.address),
         });
         onSent();
       }
@@ -437,6 +445,7 @@ function ListingCard({
                   originalMessage={originalMsg}
                   onSent={onEditSaved}
                   onRecordSent={onRecordSent}
+                  onDismiss={onDismiss}
                 />
               </div>
             </div>
@@ -507,7 +516,14 @@ export function ListingStatusPanel() {
   const pool       = view === "noteworthy"
     ? (statusFilter === "all" ? noteworthy : noteworthy.filter((l) => l.displayStatus === statusFilter))
     : forSale;
-  const visible    = pool.filter((l) => !dismissed.has(l.id));
+  const visible    = pool
+    .filter((l) => !dismissed.has(l.id))
+    .sort((a, b) => {
+      if (!a.statusDate && !b.statusDate) return 0;
+      if (!a.statusDate) return 1;
+      if (!b.statusDate) return -1;
+      return new Date(b.statusDate).getTime() - new Date(a.statusDate).getTime();
+    });
   const nDismissed = pool.filter((l) =>  dismissed.has(l.id)).length;
 
   // Count per status for chip labels
