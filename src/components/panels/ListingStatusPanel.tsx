@@ -175,7 +175,15 @@ function SendButton({
       const res = await fetch("/api/openphone/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: phone, content: message }),
+        body: JSON.stringify({
+          to: phone,
+          content: message,
+          ghl: {
+            agentName:     entry.agentName,
+            address:       entry.address,
+            displayStatus: entry.displayStatus,
+          },
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));

@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
+import { findContactByPhone, createContactNote } from "@/lib/ghl-client";
 
 const OPENPHONE_API_KEY  = (process.env.OPENPHONE_API_KEY  ?? "").trim();
 const OPENPHONE_FROM_NUM = (process.env.OPENPHONE_FROM_NUM ?? "").trim();
+
+interface SendRequest {
+  to: string;
+  content: string;
+  ghl?: {
+    agentName: string;
+    address: string;
+    displayStatus: string;
+  };
+}
 
 export async function POST(req: Request) {
   if (!OPENPHONE_API_KEY || !OPENPHONE_FROM_NUM) {
@@ -11,10 +22,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { to, content } = (await req.json()) as {
-    to: string;
-    content: string;
-  };
+  const { to, content, ghl } = (await req.json()) as SendRequest;
 
   if (!to || !content) {
     return NextResponse.json({ error: "Missing to or content" }, { status: 400 });
@@ -58,5 +66,23 @@ export async function POST(req: Request) {
   }
 
   const data = await res.json();
+
+  // Best-effort: add a note to the agent's GHL contact record
+  if (ghl && process.env.GHL_LOCATION_API_KEY) {
+    const STATUS_LABELS: Record<string, string> = {
+      sold: "Sold", pending: "Pending", backup_offers: "Accepting Backup Offers",
+      price_change: "Price Change", off_market: "Off Market", for_sale: "For Sale",
+    };
+    const statusLabel = STATUS_LABELS[ghl.displayStatus] ?? ghl.displayStatus;
+    const noteBody =
+      `Outreach sent via OpenPhone — ${ghl.address} (${statusLabel})\n\n"${content}"`;
+
+    findContactByPhone(to)
+      .then((contact) => {
+        if (contact?.id) return createContactNote(contact.id, noteBody);
+      })
+      .catch((err) => console.warn("GHL note failed (non-fatal):", err));
+  }
+
   return NextResponse.json({ success: true, data });
 }
