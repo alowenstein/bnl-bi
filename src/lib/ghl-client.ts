@@ -139,13 +139,13 @@ export async function getContact(contactId: string): Promise<GhlContact> {
 export async function findContactByPhone(phone: string): Promise<GhlContact | null> {
   const normalized = phone.startsWith("+") ? phone : `+1${phone.replace(/\D/g, "")}`;
   const data = await ghlFetch(
-    `/contacts/?locationId=${GHL_LOCATION_ID}&phone=${encodeURIComponent(normalized)}`
+    `/contacts/?locationId=${GHL_LOCATION_ID}&query=${encodeURIComponent(normalized)}`
   );
   const contacts: GhlContact[] = data?.contacts ?? [];
   return contacts[0] ?? null;
 }
 
-/** Add a note to a contact's record. Best-effort — callers should catch errors. */
+/** Add a note to a contact record. Best-effort — callers should catch errors. */
 export async function createContactNote(contactId: string, body: string): Promise<void> {
   await ghlFetch(`/contacts/${contactId}/notes`, {
     method: "POST",
