@@ -1,13 +1,15 @@
 /**
  * GET /api/market/scottsdale-listings
  *
- * Returns up to 10 for-sale listings per Scottsdale zip code where:
+ * Returns for-sale listings across all Scottsdale zip codes where:
  *   - Listing price >= $1,000,000
  *   - Days on market >= 60
  *   - Includes agent name, phone, email where available
  *
+ * Source: Realtor.com via RealtyAPI
+ *
  * Query params:
- *   ?limit=10        Max results per zip (default 10)
+ *   ?limit=10          Max results total (default 10)
  *   ?minPrice=1000000
  *   ?minDays=60
  */
@@ -15,7 +17,7 @@
 import { NextResponse } from "next/server";
 
 const REALTYAPI_KEY  = process.env.REALTYAPI_KEY ?? "";
-const REALTYAPI_BASE = "https://zillow.realtyapi.io";
+const REALTYAPI_BASE = "https://realtor.realtyapi.io";
 const BROWSER_UA     =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
@@ -34,20 +36,21 @@ interface AgentInfo {
 }
 
 interface Listing {
-  address:    string;
-  zip:        string;
-  city:       string;
-  state:      string;
-  price:      number;
-  beds:       number | null;
-  baths:      number | null;
-  sqft:       number | null;
+  address:      string;
+  zip:          string;
+  city:         string;
+  state:        string;
+  price:        number;
+  beds:         number | null;
+  baths:        number | null;
+  sqft:         number | null;
   daysOnMarket: number | null;
-  status:     string;
-  listingUrl: string;
-  photoUrl:   string | null;
-  agent:      AgentInfo;
-  mls:        string | null;
+  status:       string;
+  listingUrl:   string;
+  photoUrl:     string | null;
+  agent:        AgentInfo;
+  mls:          string | null;
+  listedDate:   string | null;
 }
 
 async function searchZip(
@@ -57,14 +60,16 @@ async function searchZip(
   limit: number,
 ): Promise<Listing[]> {
   const params = new URLSearchParams({
-    location:    zip,
-    status_type: "ForSale",
-    minPrice:    String(minPrice),
-    daysOnZillow: String(minDays),
-    limit:       String(limit),
+    postal_code:         zip,
+    status:              "for_sale",
+    list_price_min:      String(minPrice),
+    days_on_market_min:  String(minDays),
+    limit:               String(limit),
+    sort:                "days_on_market",
+    sort_dir:            "desc",
   });
 
-  const url = `${REALTYAPI_BASE}/pro/search?${params}`;
+  const url = `${REALTYAPI_BASE}/properties/search?${params}`;
 
   const res = await fetch(url, {
     headers: {
@@ -78,38 +83,50 @@ async function searchZip(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`RealtyAPI ${res.status} for zip ${zip}: ${body.slice(0, 200)}`);
+    throw new Error(`RealtyAPI ${res.status} for zip ${zip}: ${body.slice(0, 300)}`);
   }
 
   const json = await res.json() as Record<string, unknown>;
 
-  // RealtyAPI wraps results in different shapes — handle both
-  const props: Record<string, unknown>[] =
-    (json.props ?? json.results ?? json.listings ?? []) as Record<string, unknown>[];
+  // Realtor.com via RealtyAPI returns results under different keys
+  const props = (
+    json.properties ??
+    json.results    ??
+    json.listings   ??
+    json.data       ??
+    []
+  ) as Record<string, unknown>[];
 
   return props.slice(0, limit).map((p): Listing => {
-    const agent = (p.listingAgent ?? p.agent ?? {}) as Record<string, unknown>;
+    const loc     = (p.location   ?? p.address ?? {}) as Record<string, unknown>;
+    const agent   = (p.list_agent ?? p.agent   ?? p.listingAgent ?? {}) as Record<string, unknown>;
+    const desc    = (p.description ?? {}) as Record<string, unknown>;
+    const address = (loc.address   ?? loc.line  ?? p.address ?? p.street_address ?? "") as string;
+
     return {
-      address:      String(p.address ?? p.streetAddress ?? ""),
-      zip:          zip,
-      city:         String(p.city ?? "Scottsdale"),
-      state:        String(p.state ?? "AZ"),
-      price:        Number(p.price ?? p.listPrice ?? 0),
-      beds:         p.bedrooms != null ? Number(p.bedrooms) : null,
-      baths:        p.bathrooms != null ? Number(p.bathrooms) : null,
-      sqft:         p.livingArea != null ? Number(p.livingArea) : null,
-      daysOnMarket: p.daysOnZillow != null ? Number(p.daysOnZillow) : null,
-      status:       String(p.homeStatus ?? p.status ?? ""),
-      listingUrl:   p.detailUrl
-        ? `https://www.zillow.com${p.detailUrl}`
-        : String(p.url ?? ""),
-      photoUrl:     (p.imgSrc ?? p.photoUrl ?? null) as string | null,
+      address,
+      zip,
+      city:         String(loc.city  ?? p.city  ?? "Scottsdale"),
+      state:        String(loc.state ?? p.state ?? "AZ"),
+      price:        Number(p.list_price ?? p.price ?? desc.list_price ?? 0),
+      beds:         (p.beds ?? desc.beds   ?? p.bedrooms  ?? null) != null
+                      ? Number(p.beds ?? desc.beds ?? p.bedrooms) : null,
+      baths:        (p.baths ?? desc.baths ?? p.bathrooms ?? null) != null
+                      ? Number(p.baths ?? desc.baths ?? p.bathrooms) : null,
+      sqft:         (p.sqft ?? desc.sqft ?? p.living_area ?? null) != null
+                      ? Number(p.sqft ?? desc.sqft ?? p.living_area) : null,
+      daysOnMarket: (p.days_on_market ?? p.dom ?? null) != null
+                      ? Number(p.days_on_market ?? p.dom) : null,
+      status:       String(p.status ?? p.list_date ?? "for_sale"),
+      listingUrl:   String(p.href ?? p.url ?? p.detail_url ?? ""),
+      photoUrl:     (p.primary_photo ?? p.photo ?? p.imgSrc ?? null) as string | null,
       agent: {
-        name:  (agent.name  ?? null) as string | null,
-        phone: (agent.phone ?? null) as string | null,
+        name:  (agent.name  ?? agent.full_name  ?? null) as string | null,
+        phone: (agent.phone ?? agent.contact    ?? null) as string | null,
         email: (agent.email ?? null) as string | null,
       },
-      mls: (p.mlsId ?? p.mls ?? null) as string | null,
+      mls:        (p.mls_id  ?? p.mls   ?? null) as string | null,
+      listedDate: (p.list_date ?? p.listed_date ?? null) as string | null,
     };
   });
 }
@@ -124,26 +141,25 @@ export async function GET(req: Request) {
   const minDays  = Number(searchParams.get("minDays")  ?? 60);
   const limit    = Number(searchParams.get("limit")    ?? 10);
 
-  const results: { zip: string; listings: Listing[]; error?: string }[] = [];
+  const allListings: Listing[] = [];
+  const errors: { zip: string; error: string }[] = [];
 
   for (const zip of SCOTTSDALE_ZIPS) {
+    if (allListings.length >= limit) break;
+
     try {
-      const listings = await searchZip(zip, minPrice, minDays, limit);
-      if (listings.length > 0) {
-        results.push({ zip, listings });
-      }
+      const listings = await searchZip(zip, minPrice, minDays, limit - allListings.length);
+      allListings.push(...listings);
     } catch (err) {
-      results.push({ zip, listings: [], error: (err as Error).message });
+      errors.push({ zip, error: (err as Error).message });
     }
   }
 
-  const allListings = results.flatMap((r) => r.listings);
-  const errors      = results.filter((r) => r.error);
-
   return NextResponse.json({
     total:    allListings.length,
+    source:   "realtor.com via RealtyAPI",
     criteria: { minPrice, minDays, limit },
     listings: allListings,
-    errors:   errors.length > 0 ? errors : undefined,
+    ...(errors.length > 0 && { errors }),
   });
 }
