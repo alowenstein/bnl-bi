@@ -11,7 +11,6 @@
  * Set REALTYAPI_MOCK=true in .env.local to use deterministic mock data.
  */
 
-import nodemailer from "nodemailer";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -71,8 +70,6 @@ interface ChangeLogStore {
 
 const HDPH_BASE        = process.env.HDPH_BASE_URL     ?? "https://order.buildsnlenses.com/api/v1";
 const HDPH_KEY         = process.env.HDPH_API_KEY       ?? "";
-const GMAIL_USER       = process.env.GMAIL_USER         ?? "";
-const GMAIL_PASS       = process.env.GMAIL_APP_PASSWORD ?? "";
 const REALTYAPI_KEY    = process.env.REALTYAPI_KEY      ?? "";
 const REALTYAPI_MOCK   = process.env.REALTYAPI_MOCK === "true";
 const REALTYAPI_BASE   = "https://zillow.realtyapi.io";
@@ -228,6 +225,7 @@ interface RealtyApiPropertyDetails {
   listingSubType?: RealtyApiListingSubType;
   priceHistory?: RealtyApiPriceHistoryEntry[] | null;
   hiResImageLink?: string | null;
+  attributionInfo?: { listingAgentName?: string | null } | null;
 }
 
 interface RealtyApiResponse {
@@ -239,8 +237,9 @@ interface RealtyApiResult {
   status: ListingStatus;
   price: number | null;
   listingUrl: string;
-  statusDate: string | null;  // "YYYY-MM-DD" — when the status change actually happened
-  zillowPhotoUrl: string | null; // fallback photo when HDPH has no stills
+  statusDate: string | null;
+  zillowPhotoUrl: string | null;
+  listingAgentName: string | null;
 }
 
 function mapRealtyApiStatus(
@@ -306,7 +305,7 @@ function mockRealtyApiListing(site: HdphSite): RealtyApiResult {
   const slug = [site.address, site.city, site.state, site.zip]
     .filter(Boolean).join(" ").toLowerCase()
     .replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
-  return { status, price, listingUrl: `https://www.zillow.com/homes/${slug}_rb/`, statusDate: null, zillowPhotoUrl: null };
+  return { status, price, listingUrl: `https://www.zillow.com/homes/${slug}_rb/`, statusDate: null, zillowPhotoUrl: null, listingAgentName: null };
 }
 
 async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | null> {
@@ -340,8 +339,9 @@ async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | 
     : `https://www.zillow.com/homes/${encodeURIComponent(fullAddress.replace(/\s+/g, "-"))}_rb/`;
   const statusDate = statusDateFromHistory(pd.priceHistory, status);
   const zillowPhotoUrl = pd.hiResImageLink ?? null;
+  const listingAgentName = pd.attributionInfo?.listingAgentName ?? null;
 
-  return { status, price, listingUrl, statusDate, zillowPhotoUrl };
+  return { status, price, listingUrl, statusDate, zillowPhotoUrl, listingAgentName };
 }
 
 // ── Change detection ──────────────────────────────────────────────────────────
@@ -376,6 +376,15 @@ function detectChange(
   return null;
 }
 
+// Returns false when the current listing agent is clearly a different person
+// than the agent who hired BNL. Compares last names case-insensitively.
+// Returns true when agent name is unknown (can't confirm mismatch).
+function agentMatches(hdphName: string, listingAgentName: string | null): boolean {
+  if (!listingAgentName) return true; // no data → don't filter
+  const lastName = (n: string) => n.trim().split(/\s+/).pop()?.toLowerCase() ?? "";
+  return lastName(hdphName) === lastName(listingAgentName);
+}
+
 // Maps a current listing status to a backfill ChangeType when we see a site
 // for the first time. Returns null for "For Sale" / "Unknown" (nothing to show).
 function statusToBackfillChange(status: ListingStatus): ChangeType | null {
@@ -389,7 +398,7 @@ function statusToBackfillChange(status: ListingStatus): ChangeType | null {
   }
 }
 
-// ── Email ─────────────────────────────────────────────────────────────────────
+function fmt(p: number | null) { return p === null ? "—" : `$${p.toLocaleString()}`; }
 
 const CHANGE_LABELS: Record<ChangeType, string> = {
   sold: "Sold", pending: "Pending / Under Contract",
@@ -397,76 +406,6 @@ const CHANGE_LABELS: Record<ChangeType, string> = {
   back_on_market: "Back on Market", off_market: "Off Market",
 };
 
-const CHANGE_COLORS: Record<ChangeType, string> = {
-  sold: "#15803d", pending: "#b45309", backup_offers: "#c2410c",
-  price_change: "#1d4ed8", back_on_market: "#7c3aed", off_market: "#6b7280",
-};
-
-function fmt(p: number | null) { return p === null ? "—" : `$${p.toLocaleString()}`; }
-
-function buildEmailHtml(changes: ListingChange[]): string {
-  const ORDER: ChangeType[] = ["sold", "pending", "backup_offers", "price_change", "back_on_market", "off_market"];
-  const byType: Partial<Record<ChangeType, ListingChange[]>> = {};
-  for (const c of changes) { (byType[c.changeType] ??= []).push(c); }
-
-  const sections = ORDER.filter((t) => byType[t]?.length).map((t) => {
-    const color = CHANGE_COLORS[t];
-    const cards = byType[t]!.map((c) => {
-      const mlsLine = c.mls ? `MLS# ${c.mls} · ` : "";
-      const priceLine = c.changeType === "price_change" && c.priceDelta !== null
-        ? `<p style="margin:4px 0 0;font-size:12px;color:#555">
-             ${fmt(c.previousPrice)} → <strong style="color:${color}">${fmt(c.currentPrice)}</strong>
-             (${c.priceDelta > 0 ? "+" : ""}$${Math.abs(c.priceDelta).toLocaleString()})
-           </p>` : "";
-      return `
-      <div style="background:#fff;border:1px solid #dde;border-radius:6px;padding:14px 16px;margin:0 0 8px">
-        <p style="margin:0 0 4px;font-weight:600;font-size:14px">${c.address}, ${c.city} ${c.state}</p>
-        <p style="margin:0;font-size:12px;color:#555">Agent: ${c.agentName} · ${mlsLine}Detected: ${new Date(c.detectedAt).toLocaleDateString()}</p>
-        <p style="margin:6px 0 0;font-size:12px">
-          <span style="color:#aaa">${c.previousStatus}</span> → <strong style="color:${color}">${CHANGE_LABELS[t]}</strong>
-        </p>
-        ${priceLine}
-        <p style="margin:4px 0 0;font-size:11px"><a href="${c.listingUrl}" style="color:#2563eb">View Listing</a></p>
-      </div>`;
-    }).join("");
-    return `<h3 style="margin:20px 0 10px;font-size:13px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.05em">
-      ${CHANGE_LABELS[t]} (${byType[t]!.length})
-    </h3>${cards}`;
-  }).join("");
-
-  const runDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  return `
-<div style="font-family:sans-serif;max-width:620px;margin:0 auto;color:#222">
-  <div style="background:#111827;padding:20px 28px;border-radius:8px 8px 0 0">
-    <p style="color:#fff;margin:0;font-size:16px;font-weight:600">Listing Status Report</p>
-    <p style="color:#9ca3af;margin:6px 0 0;font-size:12px">
-      ${changes.length} change${changes.length !== 1 ? "s" : ""} detected — ${runDate} | Builds 'n Lenses Media
-      ${REALTYAPI_MOCK ? " · <em>MOCK DATA</em>" : ""}
-    </p>
-  </div>
-  <div style="background:#f9fafb;padding:24px 28px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none">
-    ${sections}
-    <p style="margin-top:28px;font-size:12px;color:#888">
-      Builds 'n Lenses listing status checker · Runs every Monday 9 AM AZ time
-    </p>
-  </div>
-</div>`;
-}
-
-async function sendDigestEmail(changes: ListingChange[]): Promise<void> {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: { user: GMAIL_USER, pass: GMAIL_PASS },
-  });
-  const subject = `Listing Status Report — ${changes.length} change${changes.length !== 1 ? "s" : ""} detected${REALTYAPI_MOCK ? " [MOCK]" : ""}`;
-  await transporter.sendMail({
-    from: `"Builds 'n Lenses Media" <${GMAIL_USER}>`,
-    to: GMAIL_USER,
-    subject,
-    html: buildEmailHtml(changes),
-  });
-  console.log(`✉️  Digest sent to ${GMAIL_USER}`);
-}
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -544,19 +483,23 @@ async function main() {
         result.statusDate !== null &&
         new Date(result.statusDate) < new Date(site.created);
       if (backfillType && !statusIsStale) {
-        newChanges.push({
-          id: `${site.sid}-${now}`,
-          sid: site.sid, address: site.address, address2,
-          city: site.city ?? "", state: site.state ?? "",
-          mls: site.mls ?? null,
-          agentName: site.user.name, agentEmail: site.user.email, agentPhone,
-          changeType: backfillType,
-          previousStatus: "For Sale", currentStatus: result.status,
-          previousPrice: result.price, currentPrice: result.price,
-          priceDelta: null,
-          shotDate: site.created, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
-        });
-        console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
+        if (!agentMatches(site.user.name, result.listingAgentName)) {
+          console.log(`   ⏭️  Skipped backfill: listing agent differs (${result.listingAgentName ?? "unknown"} vs ${site.user.name})`);
+        } else {
+          newChanges.push({
+            id: `${site.sid}-${now}`,
+            sid: site.sid, address: site.address, address2,
+            city: site.city ?? "", state: site.state ?? "",
+            mls: site.mls ?? null,
+            agentName: site.user.name, agentEmail: site.user.email, agentPhone,
+            changeType: backfillType,
+            previousStatus: "For Sale", currentStatus: result.status,
+            previousPrice: result.price, currentPrice: result.price,
+            priceDelta: null,
+            shotDate: site.created, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
+          });
+          console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
+        }
       } else if (backfillType && statusIsStale) {
         console.log(`   ⏭️  Skipped: status predates shoot (${result.statusDate} < ${site.created.slice(0,10)})`);
       } else {
@@ -568,20 +511,24 @@ async function main() {
     const changeType = detectChange(existing, result.status, result.price);
 
     if (changeType) {
-      newChanges.push({
-        id: `${site.sid}-${now}`,
-        sid: site.sid, address: site.address, address2,
-        city: site.city ?? "", state: site.state ?? "",
-        mls: site.mls ?? null,
-        agentName: site.user.name, agentEmail: site.user.email, agentPhone,
-        changeType,
-        previousStatus: existing.lastStatus, currentStatus: result.status,
-        previousPrice: existing.lastPrice,   currentPrice: result.price,
-        priceDelta: result.price !== null && existing.lastPrice !== null
-          ? result.price - existing.lastPrice : null,
-        shotDate: existing.shotDate, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
-      });
-      console.log(`   🔔 Change: ${CHANGE_LABELS[changeType]}`);
+      if (!agentMatches(site.user.name, result.listingAgentName)) {
+        console.log(`   ⏭️  Skipped: listing agent differs (${result.listingAgentName ?? "unknown"} vs ${site.user.name})`);
+      } else {
+        newChanges.push({
+          id: `${site.sid}-${now}`,
+          sid: site.sid, address: site.address, address2,
+          city: site.city ?? "", state: site.state ?? "",
+          mls: site.mls ?? null,
+          agentName: site.user.name, agentEmail: site.user.email, agentPhone,
+          changeType,
+          previousStatus: existing.lastStatus, currentStatus: result.status,
+          previousPrice: existing.lastPrice,   currentPrice: result.price,
+          priceDelta: result.price !== null && existing.lastPrice !== null
+            ? result.price - existing.lastPrice : null,
+          shotDate: existing.shotDate, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
+        });
+        console.log(`   🔔 Change: ${CHANGE_LABELS[changeType]}`);
+      }
     } else {
       console.log(`   — No change`);
     }
@@ -603,12 +550,6 @@ async function main() {
     log.changes = [...newChanges, ...log.changes].slice(0, MAX_LOG_ENTRIES);
     await saveChangeLog(log);
     console.log(`💾 Change log updated (${newChanges.length} new entries)`);
-    if (GMAIL_USER && GMAIL_PASS && GMAIL_USER !== "your_gmail@gmail.com") {
-      try { await sendDigestEmail(newChanges); }
-      catch (err) { console.warn("⚠️  Email digest failed (check GMAIL_USER / GMAIL_APP_PASSWORD):", (err as Error).message); }
-    } else {
-      console.log("ℹ️  Email digest skipped — GMAIL credentials not configured");
-    }
   }
 
   console.log(`\n✅ Done. Checked: ${checked}, Not found: ${notFound}, Errors: ${errors}, Changes: ${newChanges.length}`);
