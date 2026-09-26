@@ -225,6 +225,7 @@ interface RealtyApiPropertyDetails {
   listingSubType?: RealtyApiListingSubType;
   priceHistory?: RealtyApiPriceHistoryEntry[] | null;
   hiResImageLink?: string | null;
+  attributionInfo?: { listingAgentName?: string | null } | null;
 }
 
 interface RealtyApiResponse {
@@ -236,8 +237,9 @@ interface RealtyApiResult {
   status: ListingStatus;
   price: number | null;
   listingUrl: string;
-  statusDate: string | null;  // "YYYY-MM-DD" — when the status change actually happened
-  zillowPhotoUrl: string | null; // fallback photo when HDPH has no stills
+  statusDate: string | null;
+  zillowPhotoUrl: string | null;
+  listingAgentName: string | null;
 }
 
 function mapRealtyApiStatus(
@@ -303,7 +305,7 @@ function mockRealtyApiListing(site: HdphSite): RealtyApiResult {
   const slug = [site.address, site.city, site.state, site.zip]
     .filter(Boolean).join(" ").toLowerCase()
     .replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
-  return { status, price, listingUrl: `https://www.zillow.com/homes/${slug}_rb/`, statusDate: null, zillowPhotoUrl: null };
+  return { status, price, listingUrl: `https://www.zillow.com/homes/${slug}_rb/`, statusDate: null, zillowPhotoUrl: null, listingAgentName: null };
 }
 
 async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | null> {
@@ -337,8 +339,9 @@ async function fetchRealtyApiListing(site: HdphSite): Promise<RealtyApiResult | 
     : `https://www.zillow.com/homes/${encodeURIComponent(fullAddress.replace(/\s+/g, "-"))}_rb/`;
   const statusDate = statusDateFromHistory(pd.priceHistory, status);
   const zillowPhotoUrl = pd.hiResImageLink ?? null;
+  const listingAgentName = pd.attributionInfo?.listingAgentName ?? null;
 
-  return { status, price, listingUrl, statusDate, zillowPhotoUrl };
+  return { status, price, listingUrl, statusDate, zillowPhotoUrl, listingAgentName };
 }
 
 // ── Change detection ──────────────────────────────────────────────────────────
@@ -373,6 +376,15 @@ function detectChange(
   return null;
 }
 
+// Returns false when the current listing agent is clearly a different person
+// than the agent who hired BNL. Compares last names case-insensitively.
+// Returns true when agent name is unknown (can't confirm mismatch).
+function agentMatches(hdphName: string, listingAgentName: string | null): boolean {
+  if (!listingAgentName) return true; // no data → don't filter
+  const lastName = (n: string) => n.trim().split(/\s+/).pop()?.toLowerCase() ?? "";
+  return lastName(hdphName) === lastName(listingAgentName);
+}
+
 // Maps a current listing status to a backfill ChangeType when we see a site
 // for the first time. Returns null for "For Sale" / "Unknown" (nothing to show).
 function statusToBackfillChange(status: ListingStatus): ChangeType | null {
@@ -385,6 +397,8 @@ function statusToBackfillChange(status: ListingStatus): ChangeType | null {
     default:                        return null;  // For Sale / Unknown
   }
 }
+
+function fmt(p: number | null) { return p === null ? "—" : `$${p.toLocaleString()}`; }
 
 const CHANGE_LABELS: Record<ChangeType, string> = {
   sold: "Sold", pending: "Pending / Under Contract",
@@ -469,19 +483,23 @@ async function main() {
         result.statusDate !== null &&
         new Date(result.statusDate) < new Date(site.created);
       if (backfillType && !statusIsStale) {
-        newChanges.push({
-          id: `${site.sid}-${now}`,
-          sid: site.sid, address: site.address, address2,
-          city: site.city ?? "", state: site.state ?? "",
-          mls: site.mls ?? null,
-          agentName: site.user.name, agentEmail: site.user.email, agentPhone,
-          changeType: backfillType,
-          previousStatus: "For Sale", currentStatus: result.status,
-          previousPrice: result.price, currentPrice: result.price,
-          priceDelta: null,
-          shotDate: site.created, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
-        });
-        console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
+        if (!agentMatches(site.user.name, result.listingAgentName)) {
+          console.log(`   ⏭️  Skipped backfill: listing agent differs (${result.listingAgentName ?? "unknown"} vs ${site.user.name})`);
+        } else {
+          newChanges.push({
+            id: `${site.sid}-${now}`,
+            sid: site.sid, address: site.address, address2,
+            city: site.city ?? "", state: site.state ?? "",
+            mls: site.mls ?? null,
+            agentName: site.user.name, agentEmail: site.user.email, agentPhone,
+            changeType: backfillType,
+            previousStatus: "For Sale", currentStatus: result.status,
+            previousPrice: result.price, currentPrice: result.price,
+            priceDelta: null,
+            shotDate: site.created, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
+          });
+          console.log(`   📋 Backfill: ${CHANGE_LABELS[backfillType]}`);
+        }
       } else if (backfillType && statusIsStale) {
         console.log(`   ⏭️  Skipped: status predates shoot (${result.statusDate} < ${site.created.slice(0,10)})`);
       } else {
@@ -493,20 +511,24 @@ async function main() {
     const changeType = detectChange(existing, result.status, result.price);
 
     if (changeType) {
-      newChanges.push({
-        id: `${site.sid}-${now}`,
-        sid: site.sid, address: site.address, address2,
-        city: site.city ?? "", state: site.state ?? "",
-        mls: site.mls ?? null,
-        agentName: site.user.name, agentEmail: site.user.email, agentPhone,
-        changeType,
-        previousStatus: existing.lastStatus, currentStatus: result.status,
-        previousPrice: existing.lastPrice,   currentPrice: result.price,
-        priceDelta: result.price !== null && existing.lastPrice !== null
-          ? result.price - existing.lastPrice : null,
-        shotDate: existing.shotDate, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
-      });
-      console.log(`   🔔 Change: ${CHANGE_LABELS[changeType]}`);
+      if (!agentMatches(site.user.name, result.listingAgentName)) {
+        console.log(`   ⏭️  Skipped: listing agent differs (${result.listingAgentName ?? "unknown"} vs ${site.user.name})`);
+      } else {
+        newChanges.push({
+          id: `${site.sid}-${now}`,
+          sid: site.sid, address: site.address, address2,
+          city: site.city ?? "", state: site.state ?? "",
+          mls: site.mls ?? null,
+          agentName: site.user.name, agentEmail: site.user.email, agentPhone,
+          changeType,
+          previousStatus: existing.lastStatus, currentStatus: result.status,
+          previousPrice: existing.lastPrice,   currentPrice: result.price,
+          priceDelta: result.price !== null && existing.lastPrice !== null
+            ? result.price - existing.lastPrice : null,
+          shotDate: existing.shotDate, statusDate: result.statusDate, detectedAt: now, listingUrl: result.listingUrl, hdphUrl, photoUrl,
+        });
+        console.log(`   🔔 Change: ${CHANGE_LABELS[changeType]}`);
+      }
     } else {
       console.log(`   — No change`);
     }
