@@ -11,7 +11,6 @@
  * Set REALTYAPI_MOCK=true in .env.local to use deterministic mock data.
  */
 
-import nodemailer from "nodemailer";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -71,8 +70,6 @@ interface ChangeLogStore {
 
 const HDPH_BASE        = process.env.HDPH_BASE_URL     ?? "https://order.buildsnlenses.com/api/v1";
 const HDPH_KEY         = process.env.HDPH_API_KEY       ?? "";
-const GMAIL_USER       = process.env.GMAIL_USER         ?? "";
-const GMAIL_PASS       = process.env.GMAIL_APP_PASSWORD ?? "";
 const REALTYAPI_KEY    = process.env.REALTYAPI_KEY      ?? "";
 const REALTYAPI_MOCK   = process.env.REALTYAPI_MOCK === "true";
 const REALTYAPI_BASE   = "https://zillow.realtyapi.io";
@@ -389,84 +386,12 @@ function statusToBackfillChange(status: ListingStatus): ChangeType | null {
   }
 }
 
-// ── Email ─────────────────────────────────────────────────────────────────────
-
 const CHANGE_LABELS: Record<ChangeType, string> = {
   sold: "Sold", pending: "Pending / Under Contract",
   backup_offers: "Accepting Backup Offers", price_change: "Price Change",
   back_on_market: "Back on Market", off_market: "Off Market",
 };
 
-const CHANGE_COLORS: Record<ChangeType, string> = {
-  sold: "#15803d", pending: "#b45309", backup_offers: "#c2410c",
-  price_change: "#1d4ed8", back_on_market: "#7c3aed", off_market: "#6b7280",
-};
-
-function fmt(p: number | null) { return p === null ? "—" : `$${p.toLocaleString()}`; }
-
-function buildEmailHtml(changes: ListingChange[]): string {
-  const ORDER: ChangeType[] = ["sold", "pending", "backup_offers", "price_change", "back_on_market", "off_market"];
-  const byType: Partial<Record<ChangeType, ListingChange[]>> = {};
-  for (const c of changes) { (byType[c.changeType] ??= []).push(c); }
-
-  const sections = ORDER.filter((t) => byType[t]?.length).map((t) => {
-    const color = CHANGE_COLORS[t];
-    const cards = byType[t]!.map((c) => {
-      const mlsLine = c.mls ? `MLS# ${c.mls} · ` : "";
-      const priceLine = c.changeType === "price_change" && c.priceDelta !== null
-        ? `<p style="margin:4px 0 0;font-size:12px;color:#555">
-             ${fmt(c.previousPrice)} → <strong style="color:${color}">${fmt(c.currentPrice)}</strong>
-             (${c.priceDelta > 0 ? "+" : ""}$${Math.abs(c.priceDelta).toLocaleString()})
-           </p>` : "";
-      return `
-      <div style="background:#fff;border:1px solid #dde;border-radius:6px;padding:14px 16px;margin:0 0 8px">
-        <p style="margin:0 0 4px;font-weight:600;font-size:14px">${c.address}, ${c.city} ${c.state}</p>
-        <p style="margin:0;font-size:12px;color:#555">Agent: ${c.agentName} · ${mlsLine}Detected: ${new Date(c.detectedAt).toLocaleDateString()}</p>
-        <p style="margin:6px 0 0;font-size:12px">
-          <span style="color:#aaa">${c.previousStatus}</span> → <strong style="color:${color}">${CHANGE_LABELS[t]}</strong>
-        </p>
-        ${priceLine}
-        <p style="margin:4px 0 0;font-size:11px"><a href="${c.listingUrl}" style="color:#2563eb">View Listing</a></p>
-      </div>`;
-    }).join("");
-    return `<h3 style="margin:20px 0 10px;font-size:13px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.05em">
-      ${CHANGE_LABELS[t]} (${byType[t]!.length})
-    </h3>${cards}`;
-  }).join("");
-
-  const runDate = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  return `
-<div style="font-family:sans-serif;max-width:620px;margin:0 auto;color:#222">
-  <div style="background:#111827;padding:20px 28px;border-radius:8px 8px 0 0">
-    <p style="color:#fff;margin:0;font-size:16px;font-weight:600">Listing Status Report</p>
-    <p style="color:#9ca3af;margin:6px 0 0;font-size:12px">
-      ${changes.length} change${changes.length !== 1 ? "s" : ""} detected — ${runDate} | Builds 'n Lenses Media
-      ${REALTYAPI_MOCK ? " · <em>MOCK DATA</em>" : ""}
-    </p>
-  </div>
-  <div style="background:#f9fafb;padding:24px 28px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none">
-    ${sections}
-    <p style="margin-top:28px;font-size:12px;color:#888">
-      Builds 'n Lenses listing status checker · Runs every Monday 9 AM AZ time
-    </p>
-  </div>
-</div>`;
-}
-
-async function sendDigestEmail(changes: ListingChange[]): Promise<void> {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: { user: GMAIL_USER, pass: GMAIL_PASS },
-  });
-  const subject = `Listing Status Report — ${changes.length} change${changes.length !== 1 ? "s" : ""} detected${REALTYAPI_MOCK ? " [MOCK]" : ""}`;
-  await transporter.sendMail({
-    from: `"Builds 'n Lenses Media" <${GMAIL_USER}>`,
-    to: GMAIL_USER,
-    subject,
-    html: buildEmailHtml(changes),
-  });
-  console.log(`✉️  Digest sent to ${GMAIL_USER}`);
-}
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -603,12 +528,6 @@ async function main() {
     log.changes = [...newChanges, ...log.changes].slice(0, MAX_LOG_ENTRIES);
     await saveChangeLog(log);
     console.log(`💾 Change log updated (${newChanges.length} new entries)`);
-    if (GMAIL_USER && GMAIL_PASS && GMAIL_USER !== "your_gmail@gmail.com") {
-      try { await sendDigestEmail(newChanges); }
-      catch (err) { console.warn("⚠️  Email digest failed (check GMAIL_USER / GMAIL_APP_PASSWORD):", (err as Error).message); }
-    } else {
-      console.log("ℹ️  Email digest skipped — GMAIL credentials not configured");
-    }
   }
 
   console.log(`\n✅ Done. Checked: ${checked}, Not found: ${notFound}, Errors: ${errors}, Changes: ${newChanges.length}`);
