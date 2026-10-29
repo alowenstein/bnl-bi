@@ -24,7 +24,7 @@ export function middleware(req: NextRequest) {
   return new NextResponse("Unauthorized", {
     status: 401,
     headers: {
-      "WWW-Authenticate": `Basic realm="Builds 'n Lenses BI", charset="UTF-8"`,
+      "WWW-Authenticate": `Basic realm="Builds 'n lenses BI", charset="UTF-8"`,
     },
   });
 }

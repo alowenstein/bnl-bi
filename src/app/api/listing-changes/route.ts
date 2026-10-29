@@ -25,6 +25,8 @@ import {
   type HdphSite, type RealtyApiResult, type PriceHistoryEntry,
 } from "@/lib/listing-utils";
 
+export const maxDuration = 60;
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const HDPH_BASE           = process.env.HDPH_BASE_URL ?? "https://order.buildsnlenses.com/api/v1";
@@ -32,10 +34,10 @@ const HDPH_KEY            = process.env.HDPH_API_KEY  ?? "";
 const REALTYAPI_KEY       = process.env.REALTYAPI_KEY ?? "";
 const REALTYAPI_BASE      = "https://zillow.realtyapi.io";
 const WINDOW_DAYS           = 180;
-const IMAGE_FLOW_DOM        = 45;  // days on market threshold for Image Flow outreach
-const CACHE_TTL_MS          = 60 * 60 * 1000; // 1 hour
-const REALTYAPI_CONCURRENCY = 10;            // max parallel RealtyAPI calls
-const REALTYAPI_TIMEOUT_MS  = 10_000;        // abort individual call after 10 s
+const IMAGE_FLOW_DOM        = 45;
+const CACHE_TTL_MS          = 60 * 60 * 1000;
+const REALTYAPI_CONCURRENCY = 20;            // max parallel RealtyAPI calls
+const REALTYAPI_TIMEOUT_MS  = 12_000;        // abort individual call after 12 s
 const BROWSER_UA          =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
