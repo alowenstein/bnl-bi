@@ -226,9 +226,10 @@ export async function GET(req: Request) {
     const toCheckSids = new Set(toCheck.map((s) => s.sid));
     for (let i = 0; i < toCheck.length; i++) {
       const site = toCheck[i];
+      const r    = fresh[i];
       snapshots[site.sid] = {
         site,
-        result:    fresh[i].status === "fulfilled" ? fresh[i].value : null,
+        result:    r.status === "fulfilled" ? r.value : null,
         checkedAt: nowMs,
       };
     }
