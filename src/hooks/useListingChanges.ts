@@ -1,9 +1,10 @@
 import useSWR from "swr";
 import { useState, useCallback } from "react";
-import type { ListingEntry } from "@/types/listing-status";
+import type { ListingEntry, ImageFlowCandidate } from "@/types/listing-status";
 
 interface ListingChangesResponse {
   listings: ListingEntry[];
+  imageFlow: ImageFlowCandidate[];
   cached: boolean;
   fetchedAt: string;
   sitesChecked?: number;
@@ -16,8 +17,6 @@ const fetcher = (url: string) =>
   });
 
 export function useListingChanges() {
-  // bust increments on manual refresh — changes the SWR key to force a fresh
-  // server fetch that bypasses the server-side 1-hour cache
   const [bust, setBust] = useState(0);
 
   const swrKey = bust > 0
@@ -28,7 +27,6 @@ export function useListingChanges() {
     swrKey,
     fetcher,
     {
-      // Don't auto-refresh — data is live on first load, manual refresh is enough
       refreshInterval: 0,
       revalidateOnFocus: false,
     }
@@ -39,9 +37,10 @@ export function useListingChanges() {
   }, []);
 
   return {
-    listings:     data?.listings ?? [],
-    cached:       data?.cached ?? false,
-    fetchedAt:    data?.fetchedAt ?? null,
+    listings:     data?.listings   ?? [],
+    imageFlow:    data?.imageFlow  ?? [],
+    cached:       data?.cached     ?? false,
+    fetchedAt:    data?.fetchedAt  ?? null,
     sitesChecked: data?.sitesChecked ?? 0,
     error,
     isLoading,

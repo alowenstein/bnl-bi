@@ -100,3 +100,22 @@ export interface SnapshotStore {
 export interface ChangeLogStore {
   changes: ListingChange[]; // newest first, capped at 200
 }
+
+export interface ImageFlowCandidate {
+  sid: number;
+  address: string;
+  address2: string | null;
+  city: string;
+  state: string;
+  mls: string | null;
+  agentName: string;
+  agentEmail: string;
+  agentPhone: string | null;
+  shotDate: string;
+  daysOnMarket: number;
+  currentPrice: number | null;
+  listingUrl: string;
+  hdphUrl: string;
+  photoUrl: string | null;
+  socialSearchUrl: string;
+}

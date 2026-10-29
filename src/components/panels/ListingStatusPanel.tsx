@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useListingChanges } from "@/hooks/useListingChanges";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
-import type { ListingEntry, DisplayStatus } from "@/types/listing-status";
+import type { ListingEntry, DisplayStatus, ImageFlowCandidate } from "@/types/listing-status";
 import type { MessageEdit } from "@/app/api/compose-message/route";
 import { streetName } from "@/lib/listing-utils";
 
@@ -464,6 +464,118 @@ function ListingCard({
   );
 }
 
+// ── Image Flow ────────────────────────────────────────────────────────────────
+
+function ImageFlowCard({ candidate }: { candidate: ImageFlowCandidate }) {
+  const price = candidate.currentPrice
+    ? `$${candidate.currentPrice.toLocaleString()}`
+    : null;
+
+  return (
+    <div className="relative flex gap-3 rounded-xl bg-white dark:bg-gray-800 p-4 shadow-sm border border-violet-100 dark:border-violet-900">
+      {/* Photo */}
+      <div className="flex-none w-20 h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
+        {candidate.photoUrl ? (
+          <img src={candidate.photoUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-2xl">🏠</div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        {/* DOM badge */}
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className="rounded-full bg-violet-100 dark:bg-violet-900 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
+            {candidate.daysOnMarket}d on market
+          </span>
+          {price && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">{price}</span>
+          )}
+        </div>
+
+        {/* Address */}
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+          {candidate.address}{candidate.address2 ? `, ${candidate.address2}` : ""}
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {candidate.city}, {candidate.state}
+          {candidate.mls ? ` · MLS# ${candidate.mls}` : ""}
+        </p>
+
+        {/* Agent */}
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+          {candidate.agentName}
+          {candidate.agentPhone ? ` · ${candidate.agentPhone}` : ""}
+        </p>
+
+        {/* Links */}
+        <div className="mt-2 flex items-center gap-3 flex-wrap">
+          <a
+            href={candidate.socialSearchUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 rounded-md bg-violet-50 dark:bg-violet-950 px-2.5 py-1 text-xs font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900 transition-colors"
+          >
+            🔍 Verify Social
+          </a>
+          <a
+            href={candidate.hdphUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            HD Photo Hub ↗
+          </a>
+          <a
+            href={candidate.listingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            Zillow ↗
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImageFlowSection({ candidates }: { candidates: ImageFlowCandidate[] }) {
+  const [collapsed, setCollapsed] = useState(true);
+
+  if (candidates.length === 0) return null;
+
+  return (
+    <section className="space-y-3 pt-2">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex items-center gap-2 text-left"
+        >
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+            Image Flow Candidates
+          </h2>
+          <span className="rounded-full bg-violet-100 dark:bg-violet-950 px-2.5 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
+            {candidates.length}
+          </span>
+          <span className="text-xs text-gray-400 ml-1">{collapsed ? "▸" : "▾"}</span>
+        </button>
+        <span className="ml-auto text-xs text-gray-400">
+          6 AI vertical videos · $150 · still active 45+ days
+        </span>
+      </div>
+
+      {!collapsed && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+          {candidates.map((c) => (
+            <ImageFlowCard key={String(c.sid)} candidate={c} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
 type View = "noteworthy" | "for_sale";
@@ -478,7 +590,7 @@ const FILTER_CHIPS: { status: DisplayStatus; label: string; active: string; inac
 ];
 
 export function ListingStatusPanel() {
-  const { listings, isLoading, error, refresh, fetchedAt, cached } = useListingChanges();
+  const { listings, imageFlow, isLoading, error, refresh, fetchedAt, cached } = useListingChanges();
   const { dismissed, dismiss, restoreAll, hydrated } = useDismissed();
   const { history: sentHistory, recordSent } = useSentHistory();
   const [editCount, setEditCount]       = useState(0);
@@ -545,6 +657,7 @@ export function ListingStatusPanel() {
     : `Show Status Changes (${noteworthy.length})`;
 
   return (
+    <>
     <section className="space-y-4">
       {/* Header row */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -658,5 +771,7 @@ export function ListingStatusPanel() {
         </div>
       )}
     </section>
+    <ImageFlowSection candidates={imageFlow} />
+  </>
   );
 }

@@ -19,11 +19,13 @@
  */
 
 import { NextResponse } from "next/server";
-import type { ListingEntry } from "@/types/listing-status";
+import type { ListingEntry, ImageFlowCandidate } from "@/types/listing-status";
 import {
-  mapZillowStatus, getStatusDate, determineListing,
+  mapZillowStatus, getStatusDate, determineListing, formatPhone, getFirstPhotoUrl,
   type HdphSite, type RealtyApiResult, type PriceHistoryEntry,
 } from "@/lib/listing-utils";
+
+export const maxDuration = 60;
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -31,17 +33,18 @@ const HDPH_BASE           = process.env.HDPH_BASE_URL ?? "https://order.buildsnl
 const HDPH_KEY            = process.env.HDPH_API_KEY  ?? "";
 const REALTYAPI_KEY       = process.env.REALTYAPI_KEY ?? "";
 const REALTYAPI_BASE      = "https://zillow.realtyapi.io";
-const WINDOW_DAYS         = 180;
-const CACHE_TTL_MS        = 60 * 60 * 1000; // 1 hour
-const REALTYAPI_CONCURRENCY = 10;            // max parallel RealtyAPI calls
-const REALTYAPI_TIMEOUT_MS  = 10_000;        // abort individual call after 10 s
+const WINDOW_DAYS           = 180;
+const IMAGE_FLOW_DOM        = 45;
+const CACHE_TTL_MS          = 60 * 60 * 1000;
+const REALTYAPI_CONCURRENCY = 20;            // max parallel RealtyAPI calls
+const REALTYAPI_TIMEOUT_MS  = 12_000;        // abort individual call after 12 s
 const BROWSER_UA          =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
 // ── Server-side in-memory cache ───────────────────────────────────────────────
 
-interface CacheEntry { data: ListingEntry[]; fetchedAt: number }
+interface CacheEntry { data: ListingEntry[]; imageFlow: ImageFlowCandidate[]; fetchedAt: number }
 let cache: CacheEntry | null = null;
 
 // ── Concurrency limiter ───────────────────────────────────────────────────────
@@ -97,6 +100,10 @@ function withinWindow(dateStr: string, days: number): boolean {
   const d = new Date(dateStr);
   const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
   return !isNaN(d.getTime()) && d.getTime() >= cutoffMs;
+}
+
+function daysAgo(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
 }
 
 // ── RealtyAPI ─────────────────────────────────────────────────────────────────
@@ -156,10 +163,11 @@ export async function GET(req: Request) {
   // Serve from cache if fresh and no bust requested
   if (!bust && cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
     return NextResponse.json({
-      listings:     cache.data,
-      cached:       true,
-      fetchedAt:    new Date(cache.fetchedAt).toISOString(),
-      sitesChecked: cache.data.length,
+      listings:        cache.data,
+      imageFlow:       cache.imageFlow,
+      cached:          true,
+      fetchedAt:       new Date(cache.fetchedAt).toISOString(),
+      sitesChecked:    cache.data.length,
     });
   }
 
@@ -181,6 +189,7 @@ export async function GET(req: Request) {
 
   // 3. Determine display status for each listing
   const listings: ListingEntry[] = [];
+  const imageFlow: ImageFlowCandidate[] = [];
 
   for (let i = 0; i < sites.length; i++) {
     const site   = sites[i];
@@ -190,15 +199,41 @@ export async function GET(req: Request) {
     const hdphUrl = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
     const entry   = determineListing(site, result.value, hdphUrl);
     if (entry) listings.push(entry);
+
+    // Image Flow: list still-active listings where shoot was 45+ days ago
+    const dom = daysAgo(site.created);
+    if (result.value.status === "For Sale" && dom >= IMAGE_FLOW_DOM) {
+      const q = encodeURIComponent(`"${site.user.name}" realtor instagram OR facebook`);
+      imageFlow.push({
+        sid:           site.sid,
+        address:       site.address,
+        address2:      site.address2?.trim() || null,
+        city:          site.city   ?? "",
+        state:         site.state  ?? "",
+        mls:           site.mls    ?? null,
+        agentName:     site.user.name,
+        agentEmail:    site.user.email,
+        agentPhone:    formatPhone(site.user.phone),
+        shotDate:      site.created,
+        daysOnMarket:  dom,
+        currentPrice:  result.value.price,
+        listingUrl:    result.value.listingUrl,
+        hdphUrl,
+        photoUrl:      getFirstPhotoUrl(site) ?? result.value.photoUrl,
+        socialSearchUrl: `https://www.google.com/search?q=${q}`,
+      });
+    }
   }
 
   // Sort oldest shoot first
   listings.sort((a, b) => new Date(a.shotDate).getTime() - new Date(b.shotDate).getTime());
+  imageFlow.sort((a, b) => b.daysOnMarket - a.daysOnMarket); // longest on market first
 
-  cache = { data: listings, fetchedAt: Date.now() };
+  cache = { data: listings, imageFlow, fetchedAt: Date.now() };
 
   return NextResponse.json({
     listings,
+    imageFlow,
     cached:       false,
     fetchedAt:    now,
     sitesChecked: sites.length,
