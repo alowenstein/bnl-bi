@@ -66,6 +66,32 @@ interface ChangeLogStore {
   changes: ListingChange[];
 }
 
+interface StaleCandidate {
+  id: string;        // sid string — one entry per listing, not per run
+  sid: number;
+  address: string;
+  address2: string | null;
+  city: string;
+  state: string;
+  zip: string;
+  mls: string | null;
+  agentName: string;
+  agentEmail: string;
+  agentPhone: string | null;
+  shotDate: string;
+  daysOnMarket: number;
+  price: number | null;
+  listingUrl: string;
+  hdphUrl: string;
+  photoUrl: string | null;
+  socialSearchUrl: string;   // pre-built Google search for agent social media
+  detectedAt: string;
+}
+
+interface ImageFlowStore {
+  candidates: Record<string, StaleCandidate>; // keyed by sid string
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const HDPH_BASE        = process.env.HDPH_BASE_URL     ?? "https://order.buildsnlenses.com/api/v1";
@@ -74,6 +100,7 @@ const REALTYAPI_KEY    = process.env.REALTYAPI_KEY      ?? "";
 const REALTYAPI_MOCK   = process.env.REALTYAPI_MOCK === "true";
 const REALTYAPI_BASE   = "https://zillow.realtyapi.io";
 const WINDOW_DAYS      = 90;
+const IMAGE_FLOW_DOM   = 45;   // days on market threshold for Image Flow outreach
 const MAX_LOG_ENTRIES  = 200;
 const TEST_LIMIT       = process.env.TEST_LIMIT ? parseInt(process.env.TEST_LIMIT) : 0; // 0 = no limit
 
@@ -86,8 +113,9 @@ const BROWSER_UA =
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
 const __dirname       = path.dirname(fileURLToPath(import.meta.url));
-const SNAPSHOTS_FILE  = path.join(__dirname, "../data/listing-snapshots.json");
-const CHANGE_LOG_FILE = path.join(__dirname, "../data/listing-change-log.json");
+const SNAPSHOTS_FILE    = path.join(__dirname, "../data/listing-snapshots.json");
+const CHANGE_LOG_FILE   = path.join(__dirname, "../data/listing-change-log.json");
+const IMAGE_FLOW_FILE   = path.join(__dirname, "../data/image-flow-candidates.json");
 
 // ── HDPH types ────────────────────────────────────────────────────────────────
 
@@ -110,8 +138,9 @@ function getFirstPhotoUrl(site: HdphSite): string | null {
 
 // ── Storage (KV in prod, JSON file locally) ───────────────────────────────────
 
-const KV_SNAPSHOTS_KEY  = "listing:snapshots";
-const KV_CHANGE_LOG_KEY = "listing:change-log";
+const KV_SNAPSHOTS_KEY   = "listing:snapshots";
+const KV_CHANGE_LOG_KEY  = "listing:change-log";
+const KV_IMAGE_FLOW_KEY  = "listing:image-flow-candidates";
 
 async function kvGet<T>(key: string): Promise<T | null> {
   const res = await fetch(`${KV_URL}/get/${key}`, {
@@ -152,6 +181,18 @@ async function saveChangeLog(store: ChangeLogStore): Promise<void> {
   if (USE_KV) { await kvSet(KV_CHANGE_LOG_KEY, store); return; }
   fs.mkdirSync(path.dirname(CHANGE_LOG_FILE), { recursive: true });
   fs.writeFileSync(CHANGE_LOG_FILE, JSON.stringify(store, null, 2));
+}
+
+async function loadImageFlow(): Promise<ImageFlowStore> {
+  if (USE_KV) return (await kvGet<ImageFlowStore>(KV_IMAGE_FLOW_KEY)) ?? { candidates: {} };
+  try { return JSON.parse(fs.readFileSync(IMAGE_FLOW_FILE, "utf-8")) as ImageFlowStore; }
+  catch { return { candidates: {} }; }
+}
+
+async function saveImageFlow(store: ImageFlowStore): Promise<void> {
+  if (USE_KV) { await kvSet(KV_IMAGE_FLOW_KEY, store); return; }
+  fs.mkdirSync(path.dirname(IMAGE_FLOW_FILE), { recursive: true });
+  fs.writeFileSync(IMAGE_FLOW_FILE, JSON.stringify(store, null, 2));
 }
 
 // ── HDPH fetch ────────────────────────────────────────────────────────────────
@@ -195,6 +236,11 @@ function withinWindow(dateStr: string, days: number): boolean {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   return !isNaN(d.getTime()) && d >= cutoff;
+}
+
+function daysAgo(dateStr: string): number {
+  const d = new Date(dateStr);
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000);
 }
 
 // ── RealtyAPI ─────────────────────────────────────────────────────────────────
@@ -427,8 +473,9 @@ async function main() {
   }
 
   const snapshotStore = await loadSnapshots();
+  const imageFlowStore = await loadImageFlow();
   const newChanges: ListingChange[] = [];
-  let checked = 0; let errors = 0; let notFound = 0;
+  let checked = 0; let errors = 0; let notFound = 0; let imageFlowNew = 0;
 
   const sitesToCheck = TEST_LIMIT > 0 ? sites.slice(0, TEST_LIMIT) : sites;
   if (TEST_LIMIT > 0) console.log(`⚠️  TEST_LIMIT=${TEST_LIMIT} — checking first ${TEST_LIMIT} sites only`);
@@ -505,6 +552,29 @@ async function main() {
       } else {
         console.log(`   ✨ New snapshot created`);
       }
+
+      // Image Flow check for newly-seen listings already 45+ DOM
+      const domNew = daysAgo(site.created);
+      if (result.status === "For Sale" && domNew >= IMAGE_FLOW_DOM) {
+        const key = String(site.sid);
+        if (!imageFlowStore.candidates[key]) {
+          const q = encodeURIComponent(`"${site.user.name}" realtor instagram OR facebook`);
+          imageFlowStore.candidates[key] = {
+            id: key, sid: site.sid,
+            address: site.address, address2,
+            city: site.city ?? "", state: site.state ?? "", zip: site.zip ?? "",
+            mls: site.mls ?? null,
+            agentName: site.user.name, agentEmail: site.user.email, agentPhone,
+            shotDate: site.created, daysOnMarket: domNew,
+            price: result.price,
+            listingUrl: result.listingUrl, hdphUrl, photoUrl,
+            socialSearchUrl: `https://www.google.com/search?q=${q}`,
+            detectedAt: now,
+          };
+          imageFlowNew++;
+          console.log(`   📸 Image Flow candidate: ${domNew} DOM`);
+        }
+      }
       continue;
     }
 
@@ -539,6 +609,29 @@ async function main() {
       lastChecked: now, lastStatus: result.status,
       lastPrice: result.price, listingUrl: result.listingUrl,
     };
+
+    // Image Flow: surface still-active listings where shot was 45+ days ago
+    const dom = daysAgo(site.created);
+    if (result.status === "For Sale" && dom >= IMAGE_FLOW_DOM) {
+      const key = String(site.sid);
+      if (!imageFlowStore.candidates[key]) {
+        const q = encodeURIComponent(`"${site.user.name}" realtor instagram OR facebook`);
+        imageFlowStore.candidates[key] = {
+          id: key, sid: site.sid,
+          address: site.address, address2,
+          city: site.city ?? "", state: site.state ?? "", zip: site.zip ?? "",
+          mls: site.mls ?? null,
+          agentName: site.user.name, agentEmail: site.user.email, agentPhone,
+          shotDate: site.created, daysOnMarket: dom,
+          price: result.price,
+          listingUrl: result.listingUrl, hdphUrl, photoUrl,
+          socialSearchUrl: `https://www.google.com/search?q=${q}`,
+          detectedAt: now,
+        };
+        imageFlowNew++;
+        console.log(`   📸 Image Flow candidate: ${dom} DOM`);
+      }
+    }
   }
 
   snapshotStore.lastRun = new Date().toISOString();
@@ -552,7 +645,12 @@ async function main() {
     console.log(`💾 Change log updated (${newChanges.length} new entries)`);
   }
 
-  console.log(`\n✅ Done. Checked: ${checked}, Not found: ${notFound}, Errors: ${errors}, Changes: ${newChanges.length}`);
+  if (imageFlowNew > 0) {
+    await saveImageFlow(imageFlowStore);
+    console.log(`💾 Image Flow candidates updated (${imageFlowNew} new, ${Object.keys(imageFlowStore.candidates).length} total)`);
+  }
+
+  console.log(`\n✅ Done. Checked: ${checked}, Not found: ${notFound}, Errors: ${errors}, Changes: ${newChanges.length}, Image Flow: ${imageFlowNew} new`);
 }
 
 main().catch((err) => { console.error("Fatal:", err); process.exit(1); });
