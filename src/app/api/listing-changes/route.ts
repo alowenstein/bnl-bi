@@ -38,8 +38,8 @@ const WINDOW_DAYS           = 90;
 const IMAGE_FLOW_DOM        = 45;
 const L1_TTL_MS             = 5 * 60 * 1000;       // 5 min in-memory
 const REALTY_RECHECK_MS     = 4 * 60 * 60 * 1000;  // re-check each site every 4 h
-const REALTYAPI_CONCURRENCY = 20;
-const REALTYAPI_TIMEOUT_MS  = 12_000;
+const REALTYAPI_CONCURRENCY = 30;
+const REALTYAPI_TIMEOUT_MS  = 5_000;               // fast-fail; null results are retried next request
 const BROWSER_UA            =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
@@ -225,13 +225,16 @@ export async function GET(req: Request) {
     );
     const toCheckSids = new Set(toCheck.map((s) => s.sid));
     for (let i = 0; i < toCheck.length; i++) {
-      const site = toCheck[i];
-      const r    = fresh[i];
-      snapshots[site.sid] = {
-        site,
-        result:    r.status === "fulfilled" ? r.value : null,
-        checkedAt: nowMs,
-      };
+      const site   = toCheck[i];
+      const r      = fresh[i];
+      const result = r.status === "fulfilled" ? r.value : null;
+      if (result !== null) {
+        // Only cache successful lookups — null results are retried next request
+        snapshots[site.sid] = { site, result, checkedAt: nowMs };
+      } else if (snapshots[site.sid]) {
+        // Keep the old snapshot but update the HDPH site data
+        snapshots[site.sid].site = site;
+      }
     }
     // Keep HDPH site data current for cached snapshots too
     for (const site of sites) {
