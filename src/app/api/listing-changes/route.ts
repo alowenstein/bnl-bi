@@ -1,19 +1,16 @@
 /**
- * GET /api/listing-changes  — instant: reads KV, returns cached data immediately.
- *   Sets needsRefresh:true when KV is empty or stale (>1 h). The client calls
- *   POST in the background when it sees that flag.
+ * GET /api/listing-changes
  *
- * POST /api/listing-changes — async refresh: fetches HDPH, calls RealtyAPI for
- *   new/stale sites, and saves results to KV in batches so even a timeout
- *   preserves partial progress. Takes up to maxDuration (60 s on Pro, 10 s on
- *   Hobby — but partial progress is fine; the next GET will trigger another POST
- *   for the remaining sites).
+ * Fetches the current HDPH shoot window, looks up each property on Zillow
+ * via RealtyAPI, and returns all listings with their current status.
+ *
+ * In-memory cache: 1 hour. Pass ?bust to force a fresh fetch.
  */
 
 import { NextResponse } from "next/server";
-import type { ListingEntry, ImageFlowCandidate } from "@/types/listing-status";
+import type { ListingEntry } from "@/types/listing-status";
 import {
-  mapZillowStatus, getStatusDate, determineListing, formatPhone, getFirstPhotoUrl,
+  mapZillowStatus, getStatusDate, determineListing, getFirstPhotoUrl,
   type HdphSite, type RealtyApiResult, type PriceHistoryEntry,
 } from "@/lib/listing-utils";
 
@@ -25,64 +22,18 @@ const HDPH_BASE             = process.env.HDPH_BASE_URL ?? "https://order.builds
 const HDPH_KEY              = process.env.HDPH_API_KEY  ?? "";
 const REALTYAPI_KEY         = process.env.REALTYAPI_KEY ?? "";
 const REALTYAPI_BASE        = "https://zillow.realtyapi.io";
-const KV_URL                = process.env.KV_REST_API_URL;
-const KV_TOKEN              = process.env.KV_REST_API_TOKEN;
-const USE_KV                = !!(KV_URL && KV_TOKEN);
-const KV_DASHBOARD_KEY      = "listing:dashboard-cache";
-
 const WINDOW_DAYS           = 90;
-const IMAGE_FLOW_DOM        = 45;
-const L1_TTL_MS             = 5 * 60 * 1000;       // 5 min in-memory
-const CACHE_STALE_MS        = 60 * 60 * 1000;      // trigger refresh after 1 h
-const REALTY_RECHECK_MS     = 4 * 60 * 60 * 1000;  // re-check each site every 4 h
+const CACHE_TTL_MS          = 60 * 60 * 1000;  // 1 hour
 const REALTYAPI_CONCURRENCY = 30;
 const REALTYAPI_TIMEOUT_MS  = 5_000;
 const BROWSER_UA            =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── In-memory cache ───────────────────────────────────────────────────────────
 
-interface SiteSnapshot {
-  site:       HdphSite;
-  result:     RealtyApiResult | null;
-  checkedAt:  number;
-}
-interface DashboardKVCache {
-  snapshots: Record<number, SiteSnapshot>;
-  savedAt:   number;
-}
-interface L1Cache { data: ListingEntry[]; imageFlow: ImageFlowCandidate[]; fetchedAt: number }
-
-// ── L1 in-memory cache ────────────────────────────────────────────────────────
-
-let l1: L1Cache | null = null;
-
-// ── KV helpers ────────────────────────────────────────────────────────────────
-
-async function kvGet<T>(key: string): Promise<T | null> {
-  if (!USE_KV) return null;
-  try {
-    const res = await fetch(`${KV_URL}/get/${key}`, {
-      headers: { Authorization: `Bearer ${KV_TOKEN}` },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const { result } = await res.json() as { result: string | null };
-    return result ? JSON.parse(result) as T : null;
-  } catch { return null; }
-}
-
-async function kvSet(key: string, value: unknown): Promise<void> {
-  if (!USE_KV) return;
-  try {
-    await fetch(`${KV_URL}/set/${key}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${KV_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ value: JSON.stringify(value) }),
-    });
-  } catch { /* non-fatal */ }
-}
+interface CacheEntry { listings: ListingEntry[]; fetchedAt: number }
+let cache: CacheEntry | null = null;
 
 // ── Concurrency limiter ───────────────────────────────────────────────────────
 
@@ -133,10 +84,6 @@ function withinWindow(dateStr: string, days: number): boolean {
   return !isNaN(d.getTime()) && d.getTime() >= Date.now() - days * 86_400_000;
 }
 
-function daysAgo(dateStr: string): number {
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86_400_000);
-}
-
 // ── RealtyAPI ─────────────────────────────────────────────────────────────────
 
 async function fetchRealtyApiStatus(site: HdphSite): Promise<RealtyApiResult | null> {
@@ -173,49 +120,7 @@ async function fetchRealtyApiStatus(site: HdphSite): Promise<RealtyApiResult | n
   } catch { return null; }
 }
 
-// ── Build output from KV snapshots ────────────────────────────────────────────
-
-function buildOutput(snapshots: Record<number, SiteSnapshot>) {
-  const listings:  ListingEntry[]      = [];
-  const imageFlow: ImageFlowCandidate[] = [];
-
-  for (const snap of Object.values(snapshots)) {
-    if (!snap?.result) continue;
-    const { site } = snap;
-    const hdphUrl  = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
-    const entry    = determineListing(site, snap.result, hdphUrl);
-    if (entry) listings.push(entry);
-
-    const dom = daysAgo(site.created);
-    if (snap.result.status === "For Sale" && dom >= IMAGE_FLOW_DOM) {
-      const q = encodeURIComponent(`"${site.user.name}" realtor instagram OR facebook`);
-      imageFlow.push({
-        sid:            site.sid,
-        address:        site.address,
-        address2:       site.address2?.trim() || null,
-        city:           site.city   ?? "",
-        state:          site.state  ?? "",
-        mls:            site.mls    ?? null,
-        agentName:      site.user.name,
-        agentEmail:     site.user.email,
-        agentPhone:     formatPhone(site.user.phone),
-        shotDate:       site.created,
-        daysOnMarket:   dom,
-        currentPrice:   snap.result.price,
-        listingUrl:     snap.result.listingUrl,
-        hdphUrl,
-        photoUrl:       getFirstPhotoUrl(site) ?? snap.result.photoUrl,
-        socialSearchUrl: `https://www.google.com/search?q=${q}`,
-      });
-    }
-  }
-
-  listings.sort((a, b)  => new Date(a.shotDate).getTime() - new Date(b.shotDate).getTime());
-  imageFlow.sort((a, b) => b.daysOnMarket - a.daysOnMarket);
-  return { listings, imageFlow };
-}
-
-// ── GET — instant KV read ─────────────────────────────────────────────────────
+// ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function GET(req: Request) {
   if (!HDPH_KEY || !REALTYAPI_KEY) {
@@ -225,119 +130,54 @@ export async function GET(req: Request) {
   const bust  = new URL(req.url).searchParams.has("bust");
   const nowMs = Date.now();
 
-  // L1: serve from memory if fresh and no bust
-  if (!bust && l1 && nowMs - l1.fetchedAt < L1_TTL_MS) {
+  if (!bust && cache && nowMs - cache.fetchedAt < CACHE_TTL_MS) {
     return NextResponse.json({
-      listings:     l1.data,
-      imageFlow:    l1.imageFlow,
-      needsRefresh: false,
+      listings:     cache.listings,
       cached:       true,
-      fetchedAt:    new Date(l1.fetchedAt).toISOString(),
-      sitesChecked: l1.data.length,
+      fetchedAt:    new Date(cache.fetchedAt).toISOString(),
+      sitesChecked: cache.listings.length,
     });
   }
 
-  // L2: read KV (no RealtyAPI calls — always fast)
-  const kvCache = await kvGet<DashboardKVCache>(KV_DASHBOARD_KEY) ?? { snapshots: {}, savedAt: 0 };
+  const now = new Date().toISOString();
 
-  const needsRefresh =
-    bust ||
-    kvCache.savedAt === 0 ||
-    nowMs - kvCache.savedAt > CACHE_STALE_MS;
-
-  const { listings, imageFlow } = buildOutput(kvCache.snapshots);
-
-  if (!needsRefresh) {
-    l1 = { data: listings, imageFlow, fetchedAt: nowMs };
-  }
-
-  return NextResponse.json({
-    listings,
-    imageFlow,
-    needsRefresh,
-    cached:       true,
-    fetchedAt:    kvCache.savedAt ? new Date(kvCache.savedAt).toISOString() : new Date(nowMs).toISOString(),
-    sitesChecked: Object.keys(kvCache.snapshots).length,
-  });
-}
-
-// ── POST — background refresh, fault-tolerant ─────────────────────────────────
-
-export async function POST(req: Request) {
-  if (!HDPH_KEY || !REALTYAPI_KEY) {
-    return NextResponse.json({ error: "Missing API credentials" }, { status: 503 });
-  }
-
-  const bust  = new URL(req.url).searchParams.has("bust");
-  const nowMs = Date.now();
-
-  // Load current KV snapshots
-  const kvCache   = await kvGet<DashboardKVCache>(KV_DASHBOARD_KEY) ?? { snapshots: {}, savedAt: 0 };
-  const snapshots = kvCache.snapshots;
-
-  // Fetch HDPH site list
   const allSites = await fetchHdphSites();
   const sites    = allSites.filter(
     (s) => withinWindow(s.created, WINDOW_DAYS) &&
            s.media?.some((m) => m.type === "still" && !m.hidden)
   );
 
-  // Determine which sites need a RealtyAPI call
-  const toCheck = sites.filter((s) => {
-    if (bust) return true;
-    const snap = snapshots[s.sid];
-    return !snap || nowMs - snap.checkedAt > REALTY_RECHECK_MS;
-  });
+  const apiResults = await pLimit(
+    sites.map((site) => () => fetchRealtyApiStatus(site)),
+    REALTYAPI_CONCURRENCY,
+  );
 
-  // Process in batches and save to KV after each batch.
-  // If this function times out, completed batches are already persisted
-  // and will be skipped on the next POST (their checkedAt is fresh).
-  let apiCalls = 0;
-  for (let i = 0; i < toCheck.length; i += REALTYAPI_CONCURRENCY) {
-    const batch   = toCheck.slice(i, i + REALTYAPI_CONCURRENCY);
-    const results = await pLimit(batch.map((site) => () => fetchRealtyApiStatus(site)), REALTYAPI_CONCURRENCY);
+  const listings: ListingEntry[] = [];
+  for (let i = 0; i < sites.length; i++) {
+    const site   = sites[i];
+    const result = apiResults[i];
+    if (result.status !== "fulfilled" || !result.value) continue;
 
-    for (let j = 0; j < batch.length; j++) {
-      const site   = batch[j];
-      const r      = results[j];
-      const result = r.status === "fulfilled" ? r.value : null;
-      if (result !== null) {
-        snapshots[site.sid] = { site, result, checkedAt: nowMs };
-        apiCalls++;
-      } else if (snapshots[site.sid]) {
-        snapshots[site.sid].site = site; // refresh HDPH data even if RealtyAPI failed
-      }
-    }
+    const hdphUrl = `${HDPH_BASE.replace("/api/v1", "")}/Sites/summary.asp?nSiteID=${site.sid}`;
 
-    await kvSet(KV_DASHBOARD_KEY, { snapshots, savedAt: nowMs });
+    // Attach the HDPH photo URL to the result so determineListing can use it
+    const enriched: RealtyApiResult = {
+      ...result.value,
+      photoUrl: getFirstPhotoUrl(site) ?? result.value.photoUrl,
+    };
+
+    const entry = determineListing(site, enriched, hdphUrl);
+    if (entry) listings.push(entry);
   }
 
-  // Keep HDPH data current for sites not re-checked this run
-  const checkedSids = new Set(toCheck.map((s) => s.sid));
-  for (const site of sites) {
-    if (!checkedSids.has(site.sid) && snapshots[site.sid]) {
-      snapshots[site.sid].site = site;
-    }
-  }
+  listings.sort((a, b) => new Date(a.shotDate).getTime() - new Date(b.shotDate).getTime());
 
-  // Prune sites that have rolled out of the window
-  const activeSids = new Set(sites.map((s) => s.sid));
-  for (const sid of Object.keys(snapshots)) {
-    if (!activeSids.has(Number(sid))) delete snapshots[Number(sid)];
-  }
-
-  await kvSet(KV_DASHBOARD_KEY, { snapshots, savedAt: nowMs });
-
-  const { listings, imageFlow } = buildOutput(snapshots);
-  l1 = { data: listings, imageFlow, fetchedAt: nowMs };
+  cache = { listings, fetchedAt: nowMs };
 
   return NextResponse.json({
     listings,
-    imageFlow,
-    needsRefresh: false,
     cached:       false,
-    fetchedAt:    new Date(nowMs).toISOString(),
+    fetchedAt:    now,
     sitesChecked: sites.length,
-    apiCalls,
   });
 }
