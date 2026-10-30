@@ -4,8 +4,9 @@ import type { ListingEntry } from "@/types/listing-status";
 
 interface ListingChangesResponse {
   listings: ListingEntry[];
-  savedAt:  string | null;
-  empty:    boolean;
+  cached: boolean;
+  fetchedAt: string;
+  sitesChecked?: number;
 }
 
 const fetcher = (url: string) =>
@@ -15,9 +16,9 @@ const fetcher = (url: string) =>
   });
 
 export function useListingChanges() {
-  const [bust, setBust]               = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
+  // bust increments on manual refresh — changes the SWR key to force a fresh
+  // server fetch that bypasses the server-side 1-hour cache
+  const [bust, setBust] = useState(0);
 
   const swrKey = bust > 0
     ? `/api/listing-changes?bust=${bust}`
@@ -26,38 +27,25 @@ export function useListingChanges() {
   const { data, error, isLoading, mutate } = useSWR<ListingChangesResponse>(
     swrKey,
     fetcher,
-    { refreshInterval: 0, revalidateOnFocus: false }
+    {
+      // Don't auto-refresh — data is live on first load, manual refresh is enough
+      refreshInterval: 0,
+      revalidateOnFocus: false,
+    }
   );
 
-  const refresh = useCallback(async () => {
-    setIsRefreshing(true);
-    setRefreshError(null);
-    try {
-      const res = await fetch("/api/listing-changes/refresh");
-      // Even on timeout/error, re-fetch GET to show whatever partial data KV has
-      if (res.ok) {
-        const fresh = await res.json() as ListingChangesResponse;
-        mutate({ ...fresh, empty: fresh.listings.length === 0 }, { revalidate: false });
-      } else {
-        // Timed out — re-fetch GET which reads whatever partial data is in KV
-        setBust((b) => b + 1);
-        if (res.status === 504) setRefreshError("Scan timed out — showing partial results.");
-      }
-    } catch {
-      setBust((b) => b + 1);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [mutate]);
+  const refresh = useCallback(() => {
+    setBust((b) => b + 1);
+  }, []);
 
   return {
-    listings:     data?.listings  ?? [],
-    savedAt:      data?.savedAt   ?? null,
-    empty:        data?.empty     ?? true,
+    listings:     data?.listings ?? [],
+    cached:       data?.cached ?? false,
+    fetchedAt:    data?.fetchedAt ?? null,
+    sitesChecked: data?.sitesChecked ?? 0,
     error,
     isLoading,
-    isRefreshing,
-    refreshError,
     refresh,
+    mutate,
   };
 }
