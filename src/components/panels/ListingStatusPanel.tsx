@@ -234,19 +234,14 @@ function ListingCard({
   onEditSaved,
   sentRecords,
   onRecordSent,
-  showDom,
 }: {
   entry: ListingEntry;
   onDismiss: (id: string) => void;
   onEditSaved: () => void;
   sentRecords: SentRecord[];
   onRecordSent: (sid: number, status: DisplayStatus) => void;
-  showDom?: boolean;
 }) {
   const isNoteworthy = entry.displayStatus !== "for_sale";
-  const daysOnMarket = showDom
-    ? Math.floor((Date.now() - new Date(entry.shotDate).getTime()) / 86_400_000)
-    : null;
 
   const [open, setOpen]               = useState(false);
   const [message, setMessage]         = useState("");
@@ -334,11 +329,6 @@ function ListingCard({
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${BADGE[entry.displayStatus]}`}>
             {LABELS[entry.displayStatus]}
           </span>
-          {daysOnMarket !== null && (
-            <span className="rounded-full bg-violet-100 dark:bg-violet-900 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
-              {daysOnMarket}d on market
-            </span>
-          )}
           {statusDate && <span className="text-xs text-gray-500">on {statusDate}</span>}
           <span className="text-xs text-gray-300">· shot {shotDate}</span>
         </div>
@@ -476,7 +466,7 @@ function ListingCard({
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
-type View = "noteworthy" | "for_sale" | "image_flow";
+type View = "noteworthy" | "for_sale";
 
 // Filter chips shown in the noteworthy view, in display order
 const FILTER_CHIPS: { status: DisplayStatus; label: string; active: string; inactive: string }[] = [
@@ -488,26 +478,32 @@ const FILTER_CHIPS: { status: DisplayStatus; label: string; active: string; inac
 ];
 
 export function ListingStatusPanel() {
-  const { listings, savedAt, empty, isLoading, isRefreshing, error, refreshError, refresh } = useListingChanges();
+  const { listings, isLoading, error, refresh, fetchedAt, cached } = useListingChanges();
   const { dismissed, dismiss, restoreAll, hydrated } = useDismissed();
   const { history: sentHistory, recordSent } = useSentHistory();
   const [editCount, setEditCount]       = useState(0);
+  const [refreshing, setRefreshing]     = useState(false);
   const [view, setView]                 = useState<View>("noteworthy");
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all");
-  const [imageFlowDom, setImageFlowDom] = useState(45);
 
   useEffect(() => { setEditCount(countEdits()); }, []);
 
   const refreshEditCount = useCallback(() => setEditCount(countEdits()), []);
 
-  const handleSetView = useCallback((v: View) => {
-    setView(v);
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    refresh();
+    setTimeout(() => setRefreshing(false), 6000);
+  }, [refresh]);
+
+  const handleToggleView = useCallback(() => {
+    setView((v) => v === "noteworthy" ? "for_sale" : "noteworthy");
     setStatusFilter("all");
   }, []);
 
-  const savedAgo = savedAt
+  const fetchedAgo = fetchedAt
     ? (() => {
-        const mins = Math.round((Date.now() - new Date(savedAt).getTime()) / 60_000);
+        const mins = Math.round((Date.now() - new Date(fetchedAt).getTime()) / 60_000);
         if (mins < 1) return "just now";
         if (mins === 1) return "1 min ago";
         return `${mins} min ago`;
@@ -517,25 +513,17 @@ export function ListingStatusPanel() {
   if (isLoading || !hydrated) return (
     <div className="flex flex-col items-center gap-3 py-12 text-gray-400">
       <LoadingSpinner size="lg" />
-      <p className="text-sm">Loading…</p>
+      <p className="text-sm">Checking 180-day listings via Zillow…</p>
     </div>
   );
   if (error) return <ErrorBanner message={error.message} />;
 
   // Partition into noteworthy vs. for sale, then apply status filter
-  const noteworthy   = listings.filter((l) => l.displayStatus !== "for_sale");
-  const forSale      = listings.filter((l) => l.displayStatus === "for_sale");
-  const imageFlowAll = forSale.filter((l) => {
-    const daysAgo = Math.floor((Date.now() - new Date(l.shotDate).getTime()) / 86_400_000);
-    return daysAgo >= imageFlowDom;
-  });
-
-  const pool = view === "noteworthy"
+  const noteworthy = listings.filter((l) => l.displayStatus !== "for_sale");
+  const forSale    = listings.filter((l) => l.displayStatus === "for_sale");
+  const pool       = view === "noteworthy"
     ? (statusFilter === "all" ? noteworthy : noteworthy.filter((l) => l.displayStatus === statusFilter))
-    : view === "for_sale"
-    ? forSale
-    : imageFlowAll;
-
+    : forSale;
   const visible    = pool
     .filter((l) => !dismissed.has(l.id))
     .sort((a, b) => {
@@ -552,45 +540,22 @@ export function ListingStatusPanel() {
     return acc;
   }, {});
 
+  const toggleLabel = view === "noteworthy"
+    ? `Show For Sale (${forSale.length})`
+    : `Show Status Changes (${noteworthy.length})`;
 
   return (
     <section className="space-y-4">
       {/* Header row */}
       <div className="flex items-center gap-3 flex-wrap">
-        {/* View tabs */}
-        <div className="flex items-center gap-1 rounded-xl bg-gray-100 dark:bg-gray-700 p-1">
-          {(
-            [
-              { id: "noteworthy" as View,  label: "Status Changes",  count: noteworthy.length },
-              { id: "for_sale"   as View,  label: "For Sale",        count: forSale.length },
-              { id: "image_flow" as View,  label: "Image Flow",      count: imageFlowAll.length },
-            ] as const
-          ).map(({ id, label, count }) => (
-            <button
-              key={id}
-              onClick={() => handleSetView(id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === id
-                  ? id === "image_flow"
-                    ? "bg-violet-600 text-white shadow-sm"
-                    : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-              }`}
-            >
-              {label}
-              <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${
-                view === id && id === "image_flow"
-                  ? "bg-violet-500 text-white"
-                  : view === id
-                  ? "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                  : "bg-gray-200 dark:bg-gray-600 text-gray-500"
-              }`}>
-                {count}
-              </span>
-            </button>
-          ))}
-        </div>
-
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+          {view === "noteworthy" ? "Listing Status Changes" : "For Sale Portfolio"}
+        </h2>
+        {visible.length > 0 && (
+          <span className="rounded-full bg-emerald-100 dark:bg-emerald-950 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            {visible.length}
+          </span>
+        )}
         {editCount > 0 && (
           <span
             className="rounded-full bg-purple-100 dark:bg-purple-950 px-2.5 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-300"
@@ -601,22 +566,29 @@ export function ListingStatusPanel() {
         )}
 
         <div className="ml-auto flex items-center gap-2 flex-wrap">
+          {/* Toggle view */}
+          <button
+            onClick={handleToggleView}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          >
+            {toggleLabel}
+          </button>
 
           {/* Freshness */}
-          {savedAgo && (
-            <span className="text-xs text-gray-400" title={savedAt ?? ""}>
-              updated {savedAgo}
+          {fetchedAgo && (
+            <span className="text-xs text-gray-400" title={fetchedAt ?? ""}>
+              {cached ? "cached" : "live"} · {fetchedAgo}
             </span>
           )}
 
           {/* Refresh */}
           <button
-            onClick={refresh}
-            disabled={isRefreshing || isLoading}
+            onClick={handleRefresh}
+            disabled={refreshing || isLoading}
             className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >
-            <span className={isRefreshing ? "animate-spin inline-block" : "inline-block"}>↻</span>
-            {isRefreshing ? "Scanning…" : "Refresh"}
+            <span className={refreshing ? "animate-spin inline-block" : "inline-block"}>↻</span>
+            {refreshing ? "Checking…" : "Refresh"}
           </button>
 
           {/* Restore dismissed */}
@@ -627,40 +599,6 @@ export function ListingStatusPanel() {
           )}
         </div>
       </div>
-
-      {/* Empty state — no data in KV yet */}
-      {empty && !isRefreshing && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800 p-4 text-sm text-amber-800 dark:text-amber-200">
-          No data yet. Click <strong>Refresh</strong> to run the first scan (may take up to 10 seconds).
-        </div>
-      )}
-
-      {/* Partial timeout notice */}
-      {refreshError && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-300">
-          {refreshError} The hourly cron will fill in the rest automatically.
-        </div>
-      )}
-
-      {/* Image Flow threshold — only in image_flow view */}
-      {view === "image_flow" && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-xs text-gray-500">
-            Min. days on market:
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={365}
-            value={imageFlowDom}
-            onChange={(e) => setImageFlowDom(Math.max(1, Math.min(365, Number(e.target.value))))}
-            className="w-16 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs text-gray-700 dark:text-gray-300 text-center focus:outline-none focus:ring-2 focus:ring-violet-300"
-          />
-          <span className="text-xs text-gray-400">
-            Listings shot {imageFlowDom}+ days ago still active on Zillow · potential Image Flow upsell
-          </span>
-        </div>
-      )}
 
       {/* Status filter chips — only in noteworthy view when >1 type present */}
       {view === "noteworthy" && Object.keys(statusCounts).length > 1 && (
@@ -694,10 +632,8 @@ export function ListingStatusPanel() {
         <div className="rounded-xl bg-white dark:bg-gray-800 p-6 shadow-sm">
           <p className="text-sm text-gray-400 italic">
             {view === "noteworthy"
-              ? "No listings in a noteworthy state in the last 90 days. All good!"
-              : view === "for_sale"
-              ? "No for-sale listings found in the last 90 days."
-              : `No for-sale listings shot ${imageFlowDom}+ days ago. Try lowering the threshold.`}
+              ? "No listings in a noteworthy state in the last 180 days. All good!"
+              : "No for-sale listings found in the last 180 days."}
           </p>
         </div>
       ) : visible.length === 0 ? (
@@ -717,12 +653,10 @@ export function ListingStatusPanel() {
               onEditSaved={refreshEditCount}
               sentRecords={sentHistory[String(entry.sid)] ?? []}
               onRecordSent={recordSent}
-              showDom={view === "image_flow"}
             />
           ))}
         </div>
       )}
     </section>
   );
-
 }
