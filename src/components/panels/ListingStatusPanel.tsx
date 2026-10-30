@@ -488,11 +488,10 @@ const FILTER_CHIPS: { status: DisplayStatus; label: string; active: string; inac
 ];
 
 export function ListingStatusPanel() {
-  const { listings, isLoading, error, refresh, fetchedAt, cached } = useListingChanges();
+  const { listings, savedAt, empty, isLoading, isRefreshing, error, refreshError, refresh } = useListingChanges();
   const { dismissed, dismiss, restoreAll, hydrated } = useDismissed();
   const { history: sentHistory, recordSent } = useSentHistory();
   const [editCount, setEditCount]       = useState(0);
-  const [refreshing, setRefreshing]     = useState(false);
   const [view, setView]                 = useState<View>("noteworthy");
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all");
   const [imageFlowDom, setImageFlowDom] = useState(45);
@@ -501,20 +500,14 @@ export function ListingStatusPanel() {
 
   const refreshEditCount = useCallback(() => setEditCount(countEdits()), []);
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    refresh();
-    setTimeout(() => setRefreshing(false), 6000);
-  }, [refresh]);
-
   const handleSetView = useCallback((v: View) => {
     setView(v);
     setStatusFilter("all");
   }, []);
 
-  const fetchedAgo = fetchedAt
+  const savedAgo = savedAt
     ? (() => {
-        const mins = Math.round((Date.now() - new Date(fetchedAt).getTime()) / 60_000);
+        const mins = Math.round((Date.now() - new Date(savedAt).getTime()) / 60_000);
         if (mins < 1) return "just now";
         if (mins === 1) return "1 min ago";
         return `${mins} min ago`;
@@ -524,7 +517,7 @@ export function ListingStatusPanel() {
   if (isLoading || !hydrated) return (
     <div className="flex flex-col items-center gap-3 py-12 text-gray-400">
       <LoadingSpinner size="lg" />
-      <p className="text-sm">Checking 90-day listings via Zillow…</p>
+      <p className="text-sm">Loading…</p>
     </div>
   );
   if (error) return <ErrorBanner message={error.message} />;
@@ -610,20 +603,20 @@ export function ListingStatusPanel() {
         <div className="ml-auto flex items-center gap-2 flex-wrap">
 
           {/* Freshness */}
-          {fetchedAgo && (
-            <span className="text-xs text-gray-400" title={fetchedAt ?? ""}>
-              {cached ? "cached" : "live"} · {fetchedAgo}
+          {savedAgo && (
+            <span className="text-xs text-gray-400" title={savedAt ?? ""}>
+              updated {savedAgo}
             </span>
           )}
 
           {/* Refresh */}
           <button
-            onClick={handleRefresh}
-            disabled={refreshing || isLoading}
+            onClick={refresh}
+            disabled={isRefreshing || isLoading}
             className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >
-            <span className={refreshing ? "animate-spin inline-block" : "inline-block"}>↻</span>
-            {refreshing ? "Checking…" : "Refresh"}
+            <span className={isRefreshing ? "animate-spin inline-block" : "inline-block"}>↻</span>
+            {isRefreshing ? "Scanning…" : "Refresh"}
           </button>
 
           {/* Restore dismissed */}
@@ -634,6 +627,20 @@ export function ListingStatusPanel() {
           )}
         </div>
       </div>
+
+      {/* Empty state — no data in KV yet */}
+      {empty && !isRefreshing && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800 p-4 text-sm text-amber-800 dark:text-amber-200">
+          No data yet. Click <strong>Refresh</strong> to run the first scan (may take up to 10 seconds).
+        </div>
+      )}
+
+      {/* Partial timeout notice */}
+      {refreshError && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-300">
+          {refreshError} The hourly cron will fill in the rest automatically.
+        </div>
+      )}
 
       {/* Image Flow threshold — only in image_flow view */}
       {view === "image_flow" && (

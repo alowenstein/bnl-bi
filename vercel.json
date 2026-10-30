@@ -3,6 +3,10 @@
     {
       "path": "/api/weekly-digest",
       "schedule": "0 15 * * 1"
+    },
+    {
+      "path": "/api/listing-changes/refresh",
+      "schedule": "0 * * * *"
     }
   ]
 }
